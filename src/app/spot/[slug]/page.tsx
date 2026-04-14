@@ -48,7 +48,9 @@ export default function SpotPage() {
     await completeSpot(slug, xpReward);
     const s = getSession();
     if (s) setSession(s);
-    const next = getNextSlug(session.line, slug);
+    const currentSession = s ?? session;
+    if (!currentSession) return;
+    const next = getNextSlug(currentSession.line, slug);
     if (next) router.push(`/spot/${next}`);
     else router.push('/finish');
   }
