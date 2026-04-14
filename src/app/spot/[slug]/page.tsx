@@ -7,6 +7,9 @@ import { getLocationBySlug, getNextSlug, LINE_COLOR, LINE_LABEL, getLineLocation
 import HudzykMascot from '@/components/quest/HudzykMascot';
 import LocationCard from '@/components/quest/LocationCard';
 import QuizCard from '@/components/quest/QuizCard';
+import dynamic from 'next/dynamic';
+
+const QrScanner = dynamic(() => import('@/components/quest/QrScanner'), { ssr: false });
 
 type Stage = 'info' | 'quiz';
 
@@ -14,9 +17,11 @@ export default function SpotPage() {
   const params  = useParams();
   const router  = useRouter();
   const slug    = params.slug as string;
+
   const [session, setSession] = useState(getSession());
   const [stage, setStage]     = useState<Stage>('info');
   const [mounted, setMounted] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
 
   const loc = getLocationBySlug(slug);
 
@@ -25,9 +30,7 @@ export default function SpotPage() {
     const s = getSession();
     if (!s || !loc) { router.push('/'); return; }
     setSession(s);
-
     trackQrScan(slug);
-
     if (s.completedSlugs.includes(slug)) {
       const next = getNextSlug(s.line, slug);
       if (next) router.push(`/spot/${next}`);
@@ -43,6 +46,22 @@ export default function SpotPage() {
   const spotIndex  = allLocs.findIndex(l => l.slug === slug);
   const spotNumber = spotIndex + 1;
   const xpReward   = 100 + loc.quiz.length * 50;
+
+  function handleQrScan(url: string) {
+    setShowScanner(false);
+    try {
+      const parsed = new URL(url);
+      const parts  = parsed.pathname.split('/');
+      const scannedSlug = parts[parts.length - 1];
+      if (scannedSlug === slug) {
+        setStage('quiz');
+      } else {
+        router.push(`/spot/${scannedSlug}`);
+      }
+    } catch {
+      alert('Невірний QR-код');
+    }
+  }
 
   async function handleQuizComplete() {
     await completeSpot(slug, xpReward);
@@ -98,6 +117,13 @@ export default function SpotPage() {
           ))}
         </div>
 
+        {/* QR Сканер */}
+        {showScanner && (
+          <div style={{ marginBottom: 16 }}>
+            <QrScanner onScan={handleQrScan} onClose={() => setShowScanner(false)} />
+          </div>
+        )}
+
         {stage === 'info' ? (
           <LocationCard
             name={loc.name}
@@ -107,7 +133,7 @@ export default function SpotPage() {
             spotNumber={spotNumber}
             totalSpots={allLocs.length}
             lineColor={color}
-            onReady={() => setStage('quiz')}
+            onReady={() => setShowScanner(true)}
           />
         ) : (
           <QuizCard
