@@ -9,6 +9,7 @@ interface Props {
   totalSpots: number;
   lineColor: string;
   onReady: () => void;
+  onScan: () => void;
 }
 
 export default function LocationCard({ name, address, info, qrHint, spotNumber, totalSpots, lineColor, onReady }: Props) {
@@ -53,12 +54,27 @@ export default function LocationCard({ name, address, info, qrHint, spotNumber, 
         </div>
       </div>
 
-      {/* Кнопка */}
+      {/* Кнопки */}
       <button
         onClick={onReady}
-        style={{ width: '100%', padding: 16, borderRadius: 16, border: 'none', background: lineColor, color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer' }}
+        style={{
+          width: '100%', padding: 16, borderRadius: 16, border: 'none',
+          background: lineColor, color: '#fff', fontSize: 16, fontWeight: 700,
+          cursor: 'pointer', marginBottom: 10,
+        }}
       >
         Я на місці — починаю квіз →
+      </button>
+
+      <button
+        onClick={onScan}
+        style={{
+          width: '100%', padding: 13, borderRadius: 16, cursor: 'pointer',
+          border: `1.5px solid ${lineColor}`, background: 'transparent',
+          color: lineColor, fontSize: 14, fontWeight: 600,
+        }}
+      >
+        Сканувати QR-код
       </button>
     </div>
   );

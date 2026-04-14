@@ -133,7 +133,8 @@ export default function SpotPage() {
             spotNumber={spotNumber}
             totalSpots={allLocs.length}
             lineColor={color}
-            onReady={() => setShowScanner(true)}
+            onReady={() => setStage('quiz')}
+            onScan={() => setShowScanner(true)}
           />
         ) : (
           <QuizCard
