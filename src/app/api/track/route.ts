@@ -3,6 +3,7 @@ import { connectDB } from '@/lib/mongodb';
 import { SessionModel } from '@/lib/models/Session';
 import { SpotVisitModel } from '@/lib/models/SpotVisit';
 import { QrScanModel } from '@/lib/models/QrScan';
+import { UserModel } from '@/lib/models/User';
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,6 +15,8 @@ export async function POST(req: NextRequest) {
       const doc = await SessionModel.create({
         nickname:   body.nickname,
         line:       body.line,
+        ageGroup:   body.ageGroup ?? 'adults',
+        userId:     body.userId ?? null,
         deviceLang: body.deviceLang ?? '',
       });
       return NextResponse.json({ sessionId: doc._id.toString() });
@@ -28,7 +31,11 @@ export async function POST(req: NextRequest) {
         xpEarned:     body.xpEarned ?? 0,
       });
       await SessionModel.findByIdAndUpdate(body.sessionId, {
-        $set:  { xpTotal: body.xpTotal, completedCount: body.completedCount },
+        $set:  {
+          xpTotal:        body.xpTotal,
+          bonusXp:        body.bonusXp ?? 0,
+          completedCount: body.completedCount,
+        },
         $push: { completedSlugs: body.slug },
       });
       return NextResponse.json({ ok: true });
@@ -38,6 +45,22 @@ export async function POST(req: NextRequest) {
       await SessionModel.findByIdAndUpdate(body.sessionId, {
         $set: { finishedAt: new Date() },
       });
+
+      // Якщо юзер залогінений — оновлюємо його профіль
+      if (body.userId && body.line && body.ageGroup) {
+        await UserModel.findByIdAndUpdate(body.userId, {
+          $inc: { totalXp: body.finalXp ?? 0 },
+          $push: {
+            completedLines: {
+              line: body.line,
+              ageGroup: body.ageGroup,
+              completedAt: new Date(),
+              finalXp: body.finalXp ?? 0,
+            },
+          },
+        });
+      }
+
       return NextResponse.json({ ok: true });
     }
 
