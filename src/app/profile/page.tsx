@@ -193,6 +193,19 @@ export default function ProfilePage() {
             })}
           </div>
         </div>
+        
+        <button
+          onClick={() => router.push('/shop')}
+          style={{ width: '100%', padding: 14, borderRadius: 16, border: 'none', background: '#89182c', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer', marginBottom: 10 }}
+        >
+          🏪 Привілеї мандрівника
+        </button>
+        <button
+          onClick={() => router.push('/card')}
+          style={{ width: '100%', padding: 14, borderRadius: 16, border: '1.5px solid #f5e0e3', background: '#fff', color: '#89182c', fontSize: 15, fontWeight: 700, cursor: 'pointer', marginBottom: 10 }}
+        >
+          🪪 Моя картка мандрівника
+        </button>
 
         {/* Вихід */}
         <button

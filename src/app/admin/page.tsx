@@ -75,7 +75,7 @@ function QRItem({ url, label, sublabel, color }: { url: string; label: string; s
 
 // ── Головний компонент ─────────────────────────────────────
 
-type Tab = 'stats' | 'spots' | 'qr';
+type Tab = 'stats' | 'spots' | 'qr' | 'shop';
 
 export default function AdminPage() {
   const [tab, setTab] = useState<Tab>('stats');
@@ -94,10 +94,16 @@ export default function AdminPage() {
   const [filter, setFilter]       = useState<string>('all');
   const [search, setSearch]       = useState('');
   const [quizTab, setQuizTab]     = useState<string>('');
+  // Shop стан
+  const [shopItems, setShopItems]   = useState<any[]>([]);
+  const [shopLoading, setShopLoading] = useState(false);
+  const [shopEditing, setShopEditing] = useState<any | null>(null);
+  const [shopSaving, setShopSaving]   = useState(false);
+  const [shopNew, setShopNew]         = useState(false);
 
   const BASE_URL = typeof window !== 'undefined' ? window.location.origin : '';
 
-  useEffect(() => { loadStats(); loadSpots(); }, []);
+  useEffect(() => { loadStats(); loadSpots(); loadShop(); }, []);
 
   // ── Stats ────────────────────────────────────────────────
 
@@ -155,6 +161,14 @@ export default function AdminPage() {
 
   function isQuizFilled(q: QuizData) { return q.question.trim() && q.options.every(o => o.trim()); }
 
+  async function loadShop() {
+    setShopLoading(true);
+    const res  = await fetch('/api/admin/shop');
+    const data = await res.json();
+    setShopItems(data);
+    setShopLoading(false);
+  }
+
   async function handleSave() {
     if (!editing) return;
     setSaving(true);
@@ -187,6 +201,7 @@ export default function AdminPage() {
     { key: 'stats', label: 'Статистика', icon: '📊' },
     { key: 'spots', label: 'Локації',    icon: '📍' },
     { key: 'qr',    label: 'QR-коди',    icon: '📱' },
+    { key: 'shop',  label: 'Магазин',    icon: '🏪' },
   ];
 
   return (
@@ -541,6 +556,167 @@ export default function AdminPage() {
             )}
 
             <style>{`@media print { body { margin: 0; } }`}</style>
+          </>
+        )}
+
+        {/* ── ТАБ: МАГАЗИН ── */}
+        {tab === 'shop' && (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div>
+                <h1 style={{ fontSize: 20, fontWeight: 800, color: '#1A1A2E', margin: 0 }}>Магазин привілеїв</h1>
+                <p style={{ fontSize: 13, color: '#888', margin: '4px 0 0' }}>{shopItems.length} позицій</p>
+              </div>
+              <button onClick={() => { setShopNew(true); setShopEditing({ name: '', category: 'cafe', description: '', address: '', phone: '', hours: '', website: '', emoji: '🏪', type: 'info', discountText: '', xpCost: 0, isActive: true }); }} style={{ padding: '9px 20px', borderRadius: 12, border: 'none', background: '#89182c', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+                + Додати партнера
+              </button>
+            </div>
+
+            {shopLoading ? (
+              <div style={{ textAlign: 'center', padding: '40px 0', color: '#888' }}>Завантаження...</div>
+            ) : shopItems.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '48px 0' }}>
+                <div style={{ fontSize: 36, marginBottom: 12 }}>🏪</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#1a1a2e', marginBottom: 6 }}>Магазин порожній</div>
+                <div style={{ fontSize: 13, color: '#888' }}>Додайте першого партнера</div>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
+                {shopItems.map(item => (
+                  <div key={item._id} style={{ background: '#fff', borderRadius: 16, border: '1px solid #EEEEF5', padding: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
+                      <div style={{ fontSize: 28, flexShrink: 0 }}>{item.emoji}</div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: '#1A1A2E' }}>{item.name}</div>
+                        <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>{item.address}</div>
+                      </div>
+                      <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, fontWeight: 600, background: item.isActive ? '#E8F5EE' : '#FEF7E6', color: item.isActive ? '#2D7A4F' : '#8B6914' }}>
+                        {item.isActive ? '● Активний' : '○ Вимкнено'}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, fontWeight: 600, background: '#f0f0f5', color: '#555' }}>{item.category}</span>
+                      <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, fontWeight: 600, background: item.type === 'info' ? '#e8f0ff' : '#f5e0e3', color: item.type === 'info' ? '#2563EB' : '#89182c' }}>
+                        {item.type === 'info' ? 'Інфо' : item.type === 'discount' ? `Знижка · ${item.xpCost} XP` : `Безкоштовно · ${item.xpCost} XP`}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 12, color: '#555', lineHeight: 1.5, marginBottom: 12, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                      {item.description}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={() => { setShopNew(false); setShopEditing({ ...item }); }} style={{ flex: 1, padding: 8, borderRadius: 10, border: '1.5px solid #EEEEF5', background: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                        ✏️ Редагувати
+                      </button>
+                      <button onClick={async () => { if (!confirm('Видалити?')) return; await fetch('/api/admin/shop', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: item._id }) }); loadShop(); }} style={{ padding: '8px 12px', borderRadius: 10, border: '1.5px solid #fee', background: '#fff', fontSize: 13, cursor: 'pointer', color: '#DC2626' }}>
+                        🗑️
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Модал редагування/створення */}
+            {shopEditing && (
+              <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
+                <div style={{ background: '#fff', borderRadius: 20, padding: 28, width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                    <h2 style={{ fontSize: 18, fontWeight: 800, color: '#1A1A2E', margin: 0 }}>{shopNew ? 'Новий партнер' : 'Редагувати'}</h2>
+                    <button onClick={() => setShopEditing(null)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#888' }}>✕</button>
+                  </div>
+
+                  {[
+                    { label: 'Назва закладу', key: 'name',        type: 'text' },
+                    { label: 'Адреса',         key: 'address',     type: 'text' },
+                    { label: 'Телефон',        key: 'phone',       type: 'text' },
+                    { label: 'Години роботи',  key: 'hours',       type: 'text' },
+                    { label: 'Вебсайт',        key: 'website',     type: 'text' },
+                    { label: 'Emoji',           key: 'emoji',       type: 'text' },
+                  ].map(({ label, key, type }) => (
+                    <div key={key} style={{ marginBottom: 14 }}>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 6 }}>{label}</label>
+                      <input type={type} value={shopEditing[key] || ''} onChange={e => setShopEditing({ ...shopEditing, [key]: e.target.value })}
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1.5px solid #EEEEF5', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+                    </div>
+                  ))}
+
+                  <div style={{ marginBottom: 14 }}>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 6 }}>Опис</label>
+                    <textarea rows={3} value={shopEditing.description || ''} onChange={e => setShopEditing({ ...shopEditing, description: e.target.value })}
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1.5px solid #EEEEF5', fontSize: 13, outline: 'none', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 6 }}>Категорія</label>
+                      <select value={shopEditing.category} onChange={e => setShopEditing({ ...shopEditing, category: e.target.value })}
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1.5px solid #EEEEF5', fontSize: 13, outline: 'none', background: '#fff' }}>
+                        <option value="cafe">☕ Кафе</option>
+                        <option value="restaurant">🍽️ Ресторан</option>
+                        <option value="hotel">🏨 Готель</option>
+                        <option value="hostel">🛏️ Хостел</option>
+                        <option value="shop">🛍️ Магазин</option>
+                        <option value="mall">🏬 ТРЦ</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 6 }}>Тип картки</label>
+                      <select value={shopEditing.type} onChange={e => setShopEditing({ ...shopEditing, type: e.target.value })}
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1.5px solid #EEEEF5', fontSize: 13, outline: 'none', background: '#fff' }}>
+                        <option value="info">Інфо (безкоштовно)</option>
+                        <option value="discount">Знижка (за XP)</option>
+                        <option value="freebie">Безкоштовний item (за XP)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {shopEditing.type !== 'info' && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 6 }}>Текст знижки</label>
+                        <input type="text" value={shopEditing.discountText || ''} onChange={e => setShopEditing({ ...shopEditing, discountText: e.target.value })} placeholder="-15% на каву"
+                          style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1.5px solid #EEEEF5', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 6 }}>Вартість XP</label>
+                        <input type="number" value={shopEditing.xpCost || 0} onChange={e => setShopEditing({ ...shopEditing, xpCost: parseInt(e.target.value) || 0 })}
+                          style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1.5px solid #EEEEF5', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={{ marginBottom: 20 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#555' }}>
+                      <input type="checkbox" checked={shopEditing.isActive} onChange={e => setShopEditing({ ...shopEditing, isActive: e.target.checked })} />
+                      Активна позиція (показувати в магазині)
+                    </label>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <button
+                      disabled={shopSaving}
+                      onClick={async () => {
+                        setShopSaving(true);
+                        if (shopNew) {
+                          await fetch('/api/admin/shop', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(shopEditing) });
+                        } else {
+                          await fetch('/api/admin/shop', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: shopEditing._id, ...shopEditing }) });
+                        }
+                        setShopSaving(false);
+                        setShopEditing(null);
+                        loadShop();
+                      }}
+                      style={{ flex: 1, padding: 12, borderRadius: 12, border: 'none', background: '#89182c', color: '#fff', fontSize: 14, fontWeight: 700, cursor: shopSaving ? 'wait' : 'pointer' }}
+                    >
+                      {shopSaving ? 'Зберігаємо...' : shopNew ? 'Додати партнера' : 'Зберегти зміни'}
+                    </button>
+                    <button onClick={() => setShopEditing(null)} style={{ padding: '12px 20px', borderRadius: 12, border: '1.5px solid #EEEEF5', background: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', color: '#555' }}>
+                      Скасувати
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </>
         )}
 
