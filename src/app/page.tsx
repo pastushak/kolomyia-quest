@@ -32,7 +32,7 @@ export default function HomePage() {
   const cfg = lines.find(l => l.key === selectedLine);
 
   return (
-    <main style={{ minHeight: '100vh', background: 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 16px' }}>
+    <main style={{ minHeight: '100vh', background: 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 16px 48px' }}>
       <div style={{ width: '100%', maxWidth: 400 }}>
 
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
@@ -44,7 +44,7 @@ export default function HomePage() {
               selectedLine === 'green'  ? 'На площу Скорботи!' :
               'Привіт! Я Гудзик!'
             }
-            size={150}
+            size={100}
           />
         </div>
 
@@ -116,7 +116,7 @@ export default function HomePage() {
                         {line.label}
                       </div>
                       <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-                        {line.order.length} точок · старт: {line.startSlug.replace(/_/g, ' ')}
+                        {line.order.length} точок · {line.startSlug === 'train_station' ? 'Залізничний вокзал' : line.startSlug === 'bus_station' ? 'Автовокзал' : 'Площа Скорботи'}
                       </div>
                     </div>
                     <div style={{ width: 22, height: 22, borderRadius: '50%', flexShrink: 0, border: `2px solid ${active ? line.color : 'var(--border)'}`, background: active ? line.color : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -149,6 +149,20 @@ export default function HomePage() {
         >
           Розпочати квест →
         </button>
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 16 }}>
+          <a 
+            href="/about/hudzyk"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              fontSize: 13, color: '#89182c', fontWeight: 600,
+              textDecoration: 'none', padding: '8px 16px',
+              borderRadius: 20, border: '1.5px solid #f5e0e3',
+              background: '#fff',
+            }}
+          >
+            🐾 Про кота Ґудзика
+          </a>
+        </div>
 
       </div>
     </main>

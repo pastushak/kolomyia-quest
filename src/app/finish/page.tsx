@@ -123,7 +123,18 @@ export default function FinishPage() {
         <button onClick={() => { clearSession(); router.push('/'); }} style={{ width: '100%', padding: 14, borderRadius: 16, border: '1.5px solid #EEEEF5', background: '#fff', color: '#8888A8', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
           Спробувати іншу лінію
         </button>
-
+        <a href="/about/hudzyk"
+          style={{
+            display: 'block', width: '100%', padding: 14,
+            borderRadius: 16, border: '1.5px solid #f5e0e3',
+            background: '#fff', color: '#89182c', fontSize: 14,
+            fontWeight: 600, cursor: 'pointer', textAlign: 'center',
+            textDecoration: 'none', marginTop: 8,
+          }}
+        >
+          🐾 Дізнатись про кота Ґудзика
+        </a>
+      
         <p style={{ textAlign: 'center', fontSize: 12, color: '#8888A8', margin: 0 }}>
           Коломия єднає · kolomyia-quest
         </p>
