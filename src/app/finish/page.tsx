@@ -12,6 +12,7 @@ export default function FinishPage() {
   const [session, setSession] = useState<Session | null>(null);
   const [visible, setVisible] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [lineSpots, setLineSpots] = useState<{ slug: string; name: string }[]>([]);
 
   useEffect(() => {
     setMounted(true);
@@ -20,6 +21,7 @@ export default function FinishPage() {
     setSession(s);
     finishSession();
     setTimeout(() => setVisible(true), 100);
+    fetchLine(s.line).then(data => setLineSpots(data.spots));
   }, []);
 
   if (!mounted || !session) return null;
@@ -27,8 +29,7 @@ export default function FinishPage() {
   const line      = session.line;
   const color     = LINE_COLOR[line];
   const label     = LINE_LABEL[line];
-  const LINE_TOTAL: Record<string, number> = { cherry: 11, orange: 14, green: 9 };
-  const allLocs   = { length: LINE_TOTAL[line] ?? 0 };
+  const allLocs   = lineSpots;
   const completed = session.completedSlugs.length;
   const total     = allLocs.length;
   const xp        = session.xp;
