@@ -27,7 +27,8 @@ export default function FinishPage() {
   const line      = session.line;
   const color     = LINE_COLOR[line];
   const label     = LINE_LABEL[line];
-  const allLocs   = getLineLocations(line);
+  const LINE_TOTAL: Record<string, number> = { cherry: 11, orange: 14, green: 9 };
+  const allLocs   = { length: LINE_TOTAL[line] ?? 0 };
   const completed = session.completedSlugs.length;
   const total     = allLocs.length;
   const xp        = session.xp;
