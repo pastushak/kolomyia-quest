@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-export default function AdminLoginPage() {
+function LoginForm() {
   const router       = useRouter();
   const searchParams = useSearchParams();
   const from         = searchParams.get('from') || '/admin';
@@ -32,46 +32,53 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <main style={{ minHeight: '100vh', background: '#faf8f5', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-      <div style={{ width: '100%', maxWidth: 360 }}>
-
-        <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>🔐</div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#1a1a2e', margin: '0 0 6px' }}>Адмін-панель</h1>
-          <p style={{ fontSize: 14, color: '#888', margin: 0 }}>Коломия-квест</p>
-        </div>
-
-        <div style={{ background: '#fff', borderRadius: 20, padding: '28px 24px', boxShadow: '0 2px 16px rgba(0,0,0,0.06)' }}>
-          <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#555', marginBottom: 8 }}>
-            Пароль
-          </label>
-          <input
-            type="password"
-            value={password}
-            onChange={e => { setPassword(e.target.value); setError(''); }}
-            onKeyDown={e => e.key === 'Enter' && handleLogin()}
-            placeholder="Введіть пароль адміна"
-            autoFocus
-            style={{ width: '100%', padding: '12px 16px', borderRadius: 12, border: `1.5px solid ${error ? '#DC2626' : '#EEEEF5'}`, fontSize: 15, outline: 'none', marginBottom: 8, boxSizing: 'border-box' }}
-          />
-
-          {error && (
-            <p style={{ fontSize: 13, color: '#DC2626', marginBottom: 12 }}>{error}</p>
-          )}
-
-          <button
-            onClick={handleLogin}
-            disabled={loading || !password.trim()}
-            style={{ width: '100%', padding: '13px', borderRadius: 12, border: 'none', background: '#89182c', color: '#fff', fontSize: 14, fontWeight: 700, cursor: loading ? 'wait' : 'pointer', opacity: !password.trim() ? 0.4 : 1, marginTop: 8 }}
-          >
-            {loading ? 'Перевірка...' : 'Увійти'}
-          </button>
-        </div>
-
-        <p style={{ textAlign: 'center', fontSize: 12, color: '#bbb', marginTop: 16 }}>
-          kolomyia-quest · admin
-        </p>
+    <div style={{ width: '100%', maxWidth: 360 }}>
+      <div style={{ textAlign: 'center', marginBottom: 32 }}>
+        <div style={{ fontSize: 40, marginBottom: 12 }}>🔐</div>
+        <h1 style={{ fontSize: 22, fontWeight: 800, color: '#1a1a2e', margin: '0 0 6px' }}>Адмін-панель</h1>
+        <p style={{ fontSize: 14, color: '#888', margin: 0 }}>Коломия-квест</p>
       </div>
+
+      <div style={{ background: '#fff', borderRadius: 20, padding: '28px 24px', boxShadow: '0 2px 16px rgba(0,0,0,0.06)' }}>
+        <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#555', marginBottom: 8 }}>
+          Пароль
+        </label>
+        <input
+          type="password"
+          value={password}
+          onChange={e => { setPassword(e.target.value); setError(''); }}
+          onKeyDown={e => e.key === 'Enter' && handleLogin()}
+          placeholder="Введіть пароль адміна"
+          autoFocus
+          style={{ width: '100%', padding: '12px 16px', borderRadius: 12, border: `1.5px solid ${error ? '#DC2626' : '#EEEEF5'}`, fontSize: 15, outline: 'none', marginBottom: 8, boxSizing: 'border-box' }}
+        />
+
+        {error && (
+          <p style={{ fontSize: 13, color: '#DC2626', marginBottom: 12 }}>{error}</p>
+        )}
+
+        <button
+          onClick={handleLogin}
+          disabled={loading || !password.trim()}
+          style={{ width: '100%', padding: '13px', borderRadius: 12, border: 'none', background: '#89182c', color: '#fff', fontSize: 14, fontWeight: 700, cursor: loading ? 'wait' : 'pointer', opacity: !password.trim() ? 0.4 : 1, marginTop: 8 }}
+        >
+          {loading ? 'Перевірка...' : 'Увійти'}
+        </button>
+      </div>
+
+      <p style={{ textAlign: 'center', fontSize: 12, color: '#bbb', marginTop: 16 }}>
+        kolomyia-quest · admin
+      </p>
+    </div>
+  );
+}
+
+export default function AdminLoginPage() {
+  return (
+    <main style={{ minHeight: '100vh', background: '#faf8f5', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <Suspense fallback={<div style={{ fontSize: 14, color: '#888' }}>Завантаження...</div>}>
+        <LoginForm />
+      </Suspense>
     </main>
   );
 }
