@@ -1,16 +1,27 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
-import { LOCATIONS, LINE_BLUE_ORDER, LINE_RED_ORDER } from '@/data/locations';
+import { LINE_COLOR } from '@/lib/utils';
+import { Line } from '@/types';
 
-const BASE_URL = 'http://localhost:3000';
+const BASE_URL = typeof window !== 'undefined'
+  ? window.location.origin
+  : 'http://localhost:3000';
+
+interface SpotData {
+  slug:    string;
+  name:    string;
+  address: string;
+  type:    string;
+  lines:   string[];
+}
 
 interface QRItemProps {
-  url: string;
-  label: string;
+  url:       string;
+  label:     string;
   sublabel?: string;
-  color: string;
+  color:     string;
 }
 
 function QRItem({ url, label, sublabel, color }: QRItemProps) {
@@ -19,18 +30,13 @@ function QRItem({ url, label, sublabel, color }: QRItemProps) {
   useEffect(() => {
     if (!canvasRef.current) return;
     QRCode.toCanvas(canvasRef.current, url, {
-      width: 180,
-      margin: 2,
+      width: 180, margin: 2,
       color: { dark: '#1A1A2E', light: '#ffffff' },
     });
   }, [url]);
 
   return (
-    <div style={{
-      border: `2px solid ${color}`, borderRadius: 16, padding: 16,
-      textAlign: 'center', width: 220, background: '#fff',
-      breakInside: 'avoid', pageBreakInside: 'avoid',
-    }}>
+    <div style={{ border: `2px solid ${color}`, borderRadius: 16, padding: 16, textAlign: 'center', width: 220, background: '#fff', breakInside: 'avoid' }}>
       <canvas ref={canvasRef} style={{ borderRadius: 8, display: 'block', margin: '0 auto' }} />
       <div style={{ marginTop: 10, fontSize: 13, fontWeight: 700, color: '#1A1A2E' }}>{label}</div>
       {sublabel && <div style={{ fontSize: 11, color: '#888', marginTop: 3 }}>{sublabel}</div>}
@@ -40,15 +46,25 @@ function QRItem({ url, label, sublabel, color }: QRItemProps) {
 }
 
 export default function QRAdminPage() {
+  const [spots, setSpots]     = useState<SpotData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/admin/spots')
+      .then(r => r.json())
+      .then(data => { setSpots(data); setLoading(false); });
+  }, []);
+
+  // Стартові QR для кожної лінії
   const startItems = [
-    { url: `${BASE_URL}/start/blue`, label: 'Залізничний вокзал', color: '#2563EB' },
-    { url: `${BASE_URL}/start/red`,  label: 'Автовокзал',         color: '#DC2626' },
+    { url: `${BASE_URL}/start/cherry`, label: 'Залізничний вокзал', color: '#89182c' },
+    { url: `${BASE_URL}/start/orange`, label: 'Автовокзал',          color: '#e28f27' },
+    { url: `${BASE_URL}/start/green`,  label: 'Площа Скорботи',      color: '#8a9c39' },
   ];
 
   return (
     <main style={{ padding: 32, maxWidth: 1000, margin: '0 auto', fontFamily: 'sans-serif' }}>
 
-      {/* Хедер */}
       <div style={{ marginBottom: 32 }}>
         <h1 style={{ fontSize: 24, fontWeight: 800, color: '#1A1A2E', marginBottom: 6 }}>
           QR-коди для друку
@@ -58,10 +74,8 @@ export default function QRAdminPage() {
         </p>
       </div>
 
-      {/* Стартові */}
-      <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16, color: '#555', display: 'flex', alignItems: 'center', gap: 8 }}>
-        <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#2563EB' }}/>
-        Стартові QR — розмістити на вокзалах
+      <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16, color: '#555' }}>
+        Стартові QR — розмістити на початкових точках
       </h2>
       <div style={{ display: 'flex', gap: 20, marginBottom: 48, flexWrap: 'wrap' }}>
         {startItems.map(item => (
@@ -69,30 +83,31 @@ export default function QRAdminPage() {
         ))}
       </div>
 
-      {/* Локації */}
       <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16, color: '#555' }}>
         Локації — розмістити на об'єктах
       </h2>
-      <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
-        {LOCATIONS.map(loc => {
-          const inBlue = LINE_BLUE_ORDER.includes(loc.slug);
-          const inRed  = LINE_RED_ORDER.includes(loc.slug);
-          const color  = loc.type === 'finish' ? '#7F77DD'
-                       : loc.type === 'shared' ? '#2D7A4F'
-                       : inBlue ? '#2563EB' : '#DC2626';
-          return (
-            <QRItem
-              key={loc.slug}
-              url={`${BASE_URL}/spot/${loc.slug}`}
-              label={loc.name}
-              sublabel={loc.address}
-              color={color}
-            />
-          );
-        })}
-      </div>
 
-      {/* Друк стилі */}
+      {loading ? (
+        <div style={{ color: '#888', fontSize: 14 }}>Завантаження...</div>
+      ) : (
+        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+          {spots.map(spot => {
+            const color = spot.type === 'finish'
+              ? '#7F77DD'
+              : LINE_COLOR[spot.lines[0] as Line] ?? '#888';
+            return (
+              <QRItem
+                key={spot.slug}
+                url={`${BASE_URL}/spot/${spot.slug}`}
+                label={spot.name}
+                sublabel={spot.address}
+                color={color}
+              />
+            );
+          })}
+        </div>
+      )}
+
       <style>{`
         @media print {
           body { margin: 0; }
@@ -100,7 +115,6 @@ export default function QRAdminPage() {
           h2 { page-break-after: avoid; }
         }
       `}</style>
-
     </main>
   );
 }

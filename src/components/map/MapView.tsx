@@ -2,18 +2,20 @@
 
 import { MapContainer, TileLayer, Polyline, CircleMarker, Tooltip } from 'react-leaflet';
 import { Line, Location } from '@/types';
+import { LINE_COLOR } from '@/lib/utils';
 import 'leaflet/dist/leaflet.css';
 
 interface Props {
-  line: Line;
-  locations: Location[];
+  line:           Line;
+  locations:      Location[];
   completedSlugs: string[];
-  activeSlug?: string;
+  activeSlug?:    string;
 }
 
-const LINE_COLOR = { blue: '#2563EB', red: '#DC2626' };
-
 export default function MapView({ line, locations, completedSlugs, activeSlug }: Props) {
+  if (!locations || locations.length === 0) return null;
+
+  const color     = LINE_COLOR[line];
   const positions = locations.map(l => [l.lat, l.lng] as [number, number]);
   const center    = positions[Math.floor(positions.length / 2)];
 
@@ -32,15 +34,19 @@ export default function MapView({ line, locations, completedSlugs, activeSlug }:
 
       <Polyline
         positions={positions}
-        pathOptions={{ color: LINE_COLOR[line], weight: 4, opacity: 0.85 }}
+        pathOptions={{ color, weight: 4, opacity: 0.85 }}
       />
 
       {locations.map((loc, i) => {
         const done   = completedSlugs.includes(loc.slug);
         const active = loc.slug === activeSlug;
-        const color  = loc.type === 'finish' ? '#7F77DD'
-                     : loc.type === 'shared' ? '#2D7A4F'
-                     : LINE_COLOR[line];
+
+        // Колір маркера залежить від типу і стану
+        const markerColor =
+          done              ? '#9CA3AF' :
+          loc.type === 'finish' ? '#7F77DD' :
+          loc.type === 'shared' ? '#2D7A4F' :
+          color;
 
         return (
           <CircleMarker
@@ -48,13 +54,13 @@ export default function MapView({ line, locations, completedSlugs, activeSlug }:
             center={[loc.lat, loc.lng]}
             radius={active ? 14 : 10}
             pathOptions={{
-              fillColor:   done ? '#9CA3AF' : color,
+              fillColor:   markerColor,
               fillOpacity: 1,
               color:       '#fff',
               weight:      active ? 3 : 2,
             }}
           >
-            <Tooltip direction="top" offset={[0, -14]} opacity={1} permanent={false}>
+            <Tooltip direction="top" offset={[0, -14]} opacity={1}>
               <span style={{ fontSize: 12, fontWeight: 600 }}>
                 {i + 1}. {loc.name}
               </span>

@@ -1,16 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { LOCATIONS } from '@/data/locations';
 
 interface Stats {
   totalSessions: number;
   finishedSessions: number;
   totalScans: number;
   avgXp: number;
-  blueCount: number;
-  redCount: number;
-  topSpots: { slug: string; count: number }[];
+  cherryCount: number;
+  orangeCount: number;
+  greenCount:  number;
+  topSpots: { slug: string; count: number; name?: string }[];
   scansByDay: { day: string; count: number }[];
   recentSessions: {
     id: string;
@@ -38,6 +38,22 @@ export default function DashboardPage() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setStats(data);
+      // Завантажуємо назви спотів для топ локацій
+      if (data.topSpots?.length) {
+        const names = await Promise.all(
+          data.topSpots.map((s: any) =>
+            fetch(`/api/spots/${s.slug}`)
+              .then(r => r.json())
+              .then(spot => ({ slug: s.slug, name: spot.name || s.slug }))
+              .catch(() => ({ slug: s.slug, name: s.slug }))
+          )
+        );
+        const nameMap = Object.fromEntries(names.map(n => [n.slug, n.name]));
+        setStats(prev => prev ? {
+          ...prev,
+          topSpots: prev.topSpots.map(s => ({ ...s, name: nameMap[s.slug] || s.slug }))
+        } : prev);
+      }
     } catch (e: any) {
       setError(e.message ?? 'Помилка завантаження');
     }
@@ -68,7 +84,7 @@ export default function DashboardPage() {
   const finishRate  = stats.totalSessions > 0 ? Math.round((stats.finishedSessions / stats.totalSessions) * 100) : 0;
   const maxBar      = Math.max(...stats.scansByDay.map(d => d.count), 1);
   const maxSpot     = Math.max(...stats.topSpots.map(s => s.count), 1);
-  const totalLines  = (stats.blueCount + stats.redCount) || 1;
+  const totalLines = (stats.cherryCount + stats.orangeCount + stats.greenCount) || 1;
 
   return (
     <div style={{ padding: '28px 32px', maxWidth: 1100, margin: '0 auto' }}>
@@ -118,8 +134,9 @@ export default function DashboardPage() {
             Популярність маршрутів
           </div>
           {[
-            { line: 'blue', label: 'Синя лінія', sub: 'від залізн. вокзалу', count: stats.blueCount,  color: '#2563EB', bg: '#EFF6FF' },
-            { line: 'red',  label: 'Червона лінія', sub: 'від автовокзалу',  count: stats.redCount,   color: '#DC2626', bg: '#FEF2F2' },
+            { line: 'cherry', label: 'Вишнева лінія', sub: 'від залізн. вокзалу', count: stats.cherryCount, color: '#89182c', bg: '#f5e0e3' },
+            { line: 'orange', label: 'Оранжева лінія', sub: 'від автовокзалу',     count: stats.orangeCount, color: '#e28f27', bg: '#fdf0d9' },
+            { line: 'green',  label: 'Зелена лінія',  sub: 'від пл. Скорботи',    count: stats.greenCount,  color: '#8a9c39', bg: '#eef1d8' },
           ].map(l => {
             const pct = Math.round((l.count / totalLines) * 100);
             return (
@@ -191,7 +208,6 @@ export default function DashboardPage() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {stats.topSpots.map((s, i) => {
-              const loc = LOCATIONS.find(l => l.slug === s.slug);
               const pct = Math.round((s.count / maxSpot) * 100);
               const medal = ['🥇','🥈','🥉'][i] ?? '';
               return (
@@ -201,7 +217,7 @@ export default function DashboardPage() {
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-                      <span style={{ fontSize: 14, fontWeight: 600, color: '#1A1A2E' }}>{loc?.name ?? s.slug}</span>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: '#1A1A2E' }}>{s.name ?? s.slug}</span>
                       <span style={{ fontSize: 12, color: '#888', fontWeight: 600 }}>{s.count} відвідань</span>
                     </div>
                     <div style={{ height: 7, background: '#F3F4F6', borderRadius: 4, overflow: 'hidden' }}>

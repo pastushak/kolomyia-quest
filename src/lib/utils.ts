@@ -1,37 +1,66 @@
-import { Line } from '@/types';
-import { LOCATIONS, LINE_BLUE_ORDER, LINE_RED_ORDER } from '@/data/locations';
+import { Line, Location, QuestLine } from '@/types';
 
-export function getLineOrder(line: Line) {
-  return line === 'blue' ? LINE_BLUE_ORDER : LINE_RED_ORDER;
+// ── Кольори ліній (з логотипу Коломиї) ───────────────────
+export const LINE_COLOR: Record<Line, string> = {
+  cherry: '#89182c',
+  orange: '#e28f27',
+  green:  '#8a9c39',
+};
+
+export const LINE_LABEL: Record<Line, string> = {
+  cherry: 'Вишнева лінія',
+  orange: 'Оранжева лінія',
+  green:  'Зелена лінія',
+};
+
+export const LINE_START: Record<Line, string> = {
+  cherry: 'Залізничний вокзал',
+  orange: 'Автовокзал',
+  green:  'Площа Скорботи',
+};
+
+export const LINE_EMOJI: Record<Line, string> = {
+  cherry: '🚂',
+  orange: '🚌',
+  green:  '🌿',
+};
+
+// ── Fetch лінії з API ─────────────────────────────────────
+export async function fetchLine(key: Line): Promise<QuestLine & { spots: Location[] }> {
+  const res = await fetch(`/api/lines/${key}`, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`fetchLine failed: ${key}`);
+  return res.json();
 }
 
-export function getNextSlug(line: Line, currentSlug: string): string | null {
-  const order = getLineOrder(line);
+// ── Fetch всіх ліній (для стартової сторінки) ────────────
+export async function fetchAllLines(): Promise<QuestLine[]> {
+  const res = await fetch('/api/lines', { cache: 'no-store' });
+  if (!res.ok) throw new Error('fetchAllLines failed');
+  return res.json();
+}
+
+// ── Fetch одного споту ────────────────────────────────────
+export async function fetchSpot(slug: string): Promise<Location> {
+  const res = await fetch(`/api/spots/${slug}`, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`fetchSpot failed: ${slug}`);
+  return res.json();
+}
+
+// ── Наступний slug у лінії ────────────────────────────────
+export function getNextSlug(
+  order: string[],
+  currentSlug: string,
+): string | null {
   const idx = order.indexOf(currentSlug);
   if (idx === -1 || idx === order.length - 1) return null;
   return order[idx + 1];
 }
 
-export function getLocationBySlug(slug: string) {
-  return LOCATIONS.find(l => l.slug === slug) ?? null;
+// ── Квіз для конкретної лінії на споті ───────────────────
+export function getQuizForLine(
+  spot: Location,
+  line: Line,
+) {
+  if (!spot.quizzes || spot.quizzes.length === 0) return null;
+  return spot.quizzes.find(q => q.line === line) ?? null;
 }
-
-export function getLineLocations(line: Line) {
-  const order = getLineOrder(line);
-  return order.map(slug => LOCATIONS.find(l => l.slug === slug)!);
-}
-
-export const LINE_COLOR = {
-  blue: '#378ADD',
-  red:  '#E24B4A',
-} as const;
-
-export const LINE_LABEL = {
-  blue: 'Синя лінія',
-  red:  'Червона лінія',
-} as const;
-
-export const LINE_START = {
-  blue: 'Залізничний вокзал',
-  red:  'Автовокзал',
-} as const;

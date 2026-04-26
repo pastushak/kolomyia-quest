@@ -12,7 +12,7 @@ interface Props {
   onScan: () => void;
 }
 
-export default function LocationCard({ name, address, info, qrHint, spotNumber, totalSpots, lineColor, onReady }: Props) {
+export default function LocationCard({ name, address, info, qrHint, spotNumber, totalSpots, lineColor, onReady, onScan }: Props) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 

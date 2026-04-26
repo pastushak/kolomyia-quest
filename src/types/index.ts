@@ -1,74 +1,80 @@
-// Чотири лінії маршрутів (було тільки blue/red)
-export type Line = 'blue' | 'red' | 'orange' | 'green';
+// ── Лінії маршрутів ──────────────────────────────────────
+export type Line = 'cherry' | 'orange' | 'green';
 export type LocationType = 'start' | 'regular' | 'shared' | 'finish';
 
-// НОВЕ: вікові групи
+// ── Вікові групи ─────────────────────────────────────────
 export type AgeGroup = 'kids' | 'teens' | 'adults';
 
+// ── Квіз ─────────────────────────────────────────────────
 export interface QuizQuestion {
-  question: string;
-  options: string[];
+  question:     string;
+  options:      string[];
   correctIndex: number;
-  explanation: string;
+  explanation:  string;
 }
 
-// НОВЕ: варіативний контент для однієї вікової групи
-export interface AgeContent {
-  info: string;
-  quiz: QuizQuestion[];
-  funFact?: string;
+// Квіз прив'язаний до конкретної лінії на спільній локації
+export interface LineQuiz {
+  line:         Line;
+  question:     string;
+  options:      string[];
+  correctIndex: number;
+  explanation:  string;
 }
 
+// ── Локація (з MongoDB) ───────────────────────────────────
 export interface Location {
-  slug: string;
-  name: string;
-  lat: number;
-  lng: number;
-  line: Line | 'shared' | 'finish';
-  type: LocationType;
-  address: string;
+  slug:      string;
+  name:      string;
+  lat:       number;
+  lng:       number;
+  address:   string;
+  qrHint:    string;
+  info:      string;
+  type:      LocationType;
 
-  // Підказка QR — загальна для всіх віків
-  qrHint: string;
+  // Яким лініям належить спот
+  lines:     Line[];
 
-  // Контент за віковими групами (новий варіативний шар).
-  // Може бути відсутнім на локаціях, які ще не мігровані — тоді
-  // використовується fallback на info/quiz нижче.
-  content?: {
-    kids?: AgeContent;
-    teens?: AgeContent;
-    adults?: AgeContent;
-  };
+  // На які лінії можна пересісти з цього споту
+  transfers: Line[];
 
-  // Legacy-поля — fallback для локацій без content (поки команда наповнює)
-  info: string;
-  quiz: QuizQuestion[];
+  // Квіз per-line (null = ще не готовий — показуємо "скоро")
+  quizzes:   LineQuiz[] | null;
 }
 
+// ── Лінія маршруту (з MongoDB) ────────────────────────────
+export interface QuestLine {
+  key:       Line;
+  label:     string;
+  color:     string;
+  startSlug: string;
+  order:     string[];  // масив slug-ів у порядку проходження
+}
+
+// ── Сесія туриста (localStorage) ─────────────────────────
 export interface Session {
-  nickname: string;
-  line: Line;
+  nickname:       string;
+  line:           Line;
+  ageGroup:       AgeGroup;
   completedSlugs: string[];
-  xp: number;
-  startedAt: string;
-
-  // НОВЕ
-  ageGroup: AgeGroup;
-  userId?: string;   // id з MongoDB (для залогінених через Google)
-  bonusXp?: number;  // +20% бонус для залогінених
+  xp:             number;
+  bonusXp:        number;
+  startedAt:      string;
+  userId?:        string;
 }
 
-// НОВЕ: профіль залогіненого користувача (з NextAuth + наша User модель)
+// ── Профіль залогіненого користувача ─────────────────────
 export interface UserProfile {
-  id: string;
-  email: string;
-  name: string;
+  id:       string;
+  email:    string;
+  name:     string;
   avatarUrl?: string;
-  totalXp: number;
+  totalXp:  number;
   completedLines: Array<{
-    line: Line;
-    ageGroup: AgeGroup;
+    line:        Line;
+    ageGroup:    AgeGroup;
     completedAt: string;
-    finalXp: number;
+    finalXp:     number;
   }>;
 }

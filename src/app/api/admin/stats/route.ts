@@ -37,23 +37,31 @@ export async function GET() {
         { $sort: { _id: 1 } },
       ]),
       SessionModel.aggregate([
-        { $group: { _id: '$line', count: { $sum: 1 }, avgXp: { $avg: '$xpTotal' } } },
+        { $group: { _id: '$line', count: { $sum: 1 } } },
       ]),
     ]);
 
     const avgXp = sessions.length
-      ? Math.round(sessions.reduce((s: number, r: any) => s + (r.xpTotal || 0), 0) / sessions.length)
+      ? Math.round(
+          sessions.reduce((s: number, r: any) => s + (r.xpTotal || 0), 0)
+          / sessions.length,
+        )
       : 0;
+
+    // Статистика по трьох лініях
+    const lineCount = (key: string) =>
+      lineStats.find((l: any) => l._id === key)?.count ?? 0;
 
     return NextResponse.json({
       totalSessions,
       finishedSessions,
       totalScans,
       avgXp,
-      blueCount:  lineStats.find((l: any) => l._id === 'blue')?.count ?? 0,
-      redCount:   lineStats.find((l: any) => l._id === 'red')?.count  ?? 0,
-      topSpots:   topSpots.map((s: any) => ({ slug: s._id, count: s.count })),
-      scansByDay: scansByDay.map((d: any) => ({ day: d._id, count: d.count })),
+      cherryCount: lineCount('cherry'),
+      orangeCount: lineCount('orange'),
+      greenCount:  lineCount('green'),
+      topSpots:    topSpots.map((s: any) => ({ slug: s._id, count: s.count })),
+      scansByDay:  scansByDay.map((d: any) => ({ day: d._id, count: d.count })),
       recentSessions: sessions.map((s: any) => ({
         id:             s._id.toString(),
         nickname:       s.nickname,
@@ -64,9 +72,11 @@ export async function GET() {
         finishedAt:     s.finishedAt,
       })),
     });
-
   } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    console.error('GET /api/admin/stats:', err);
+    return NextResponse.json(
+      { error: 'Server error' },
+      { status: 500 },
+    );
   }
 }

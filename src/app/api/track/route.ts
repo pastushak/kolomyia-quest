@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
         xpEarned:     body.xpEarned ?? 0,
       });
       await SessionModel.findByIdAndUpdate(body.sessionId, {
-        $set:  {
+        $set: {
           xpTotal:        body.xpTotal,
           bonusXp:        body.bonusXp ?? 0,
           completedCount: body.completedCount,
@@ -45,22 +45,19 @@ export async function POST(req: NextRequest) {
       await SessionModel.findByIdAndUpdate(body.sessionId, {
         $set: { finishedAt: new Date() },
       });
-
-      // Якщо юзер залогінений — оновлюємо його профіль
       if (body.userId && body.line && body.ageGroup) {
         await UserModel.findByIdAndUpdate(body.userId, {
           $inc: { totalXp: body.finalXp ?? 0 },
           $push: {
             completedLines: {
-              line: body.line,
-              ageGroup: body.ageGroup,
+              line:        body.line,
+              ageGroup:    body.ageGroup,
               completedAt: new Date(),
-              finalXp: body.finalXp ?? 0,
+              finalXp:     body.finalXp ?? 0,
             },
           },
         });
       }
-
       return NextResponse.json({ ok: true });
     }
 
@@ -72,10 +69,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    return NextResponse.json({ error: 'Unknown event' }, { status: 400 });
-
+    return NextResponse.json(
+      { error: 'Unknown event' },
+      { status: 400 },
+    );
   } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    console.error('POST /api/track:', err);
+    return NextResponse.json(
+      { error: 'Server error' },
+      { status: 500 },
+    );
   }
 }
