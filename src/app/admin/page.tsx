@@ -479,7 +479,7 @@ export default function AdminPage() {
                           </div>
                           <div style={{ marginBottom: 12 }}>
                             <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 6 }}>Варіанти <span style={{ fontWeight: 400, color: '#888' }}>(клікни кружечок = правильна)</span></label>
-                            {currentQuiz.options.map((opt, i) => (
+                            {currentQuiz.options.map((opt: string, i: number) => (
                               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                                 <button onClick={() => updateQuiz(quizTab, 'correctIndex', i)} style={{ width: 24, height: 24, borderRadius: '50%', flexShrink: 0, cursor: 'pointer', border: 'none', background: currentQuiz.correctIndex === i ? '#2D7A4F' : '#EEEEF5', color: currentQuiz.correctIndex === i ? '#fff' : '#888', fontSize: 11, fontWeight: 700 }}>{i + 1}</button>
                                 <input type="text" value={opt} onChange={e => updateOption(quizTab, i, e.target.value)} placeholder={`Варіант ${i + 1}`}
