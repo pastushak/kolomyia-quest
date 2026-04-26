@@ -1,7 +1,7 @@
 import mongoose, { Schema, model, models } from 'mongoose';
 
 const CompletedLineSchema = new Schema({
-  line:        { type: String, enum: ['blue', 'red', 'orange', 'green'], required: true },
+  line:        { type: String, enum: ['cherry', 'orange', 'green'], required: true },
   ageGroup:    { type: String, enum: ['kids', 'teens', 'adults'], required: true },
   completedAt: { type: Date, default: Date.now },
   finalXp:     { type: Number, required: true },
