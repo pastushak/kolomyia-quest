@@ -5,6 +5,12 @@ export type LocationType = 'start' | 'regular' | 'shared' | 'finish';
 // ── Вікові групи ─────────────────────────────────────────
 export type AgeGroup = 'kids' | 'teens' | 'adults';
 
+// ── Віковий контент ───────────────────────────────────────
+export interface AgeContent {
+  info?: string;
+  quiz?: QuizQuestion | null;
+}
+
 // ── Квіз ─────────────────────────────────────────────────
 export interface QuizQuestion {
   question:     string;
