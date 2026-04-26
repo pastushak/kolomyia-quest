@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Polyline, CircleMarker, Tooltip } from 'react-leaflet';
 import { Line, Location } from '@/types';
 import { LINE_COLOR } from '@/lib/utils';
@@ -12,12 +13,67 @@ interface Props {
   activeSlug?:    string;
 }
 
+// Запит до OSRM — повертає масив координат по вулицях між двома точками
+async function fetchOsrmRoute(
+  from: [number, number],
+  to:   [number, number],
+): Promise<[number, number][]> {
+  try {
+    const url = `https://router.project-osrm.org/route/v1/foot/${from[1]},${from[0]};${to[1]},${to[0]}?overview=full&geometries=geojson`;
+    const res  = await fetch(url);
+    const data = await res.json();
+    if (data.code !== 'Ok' || !data.routes?.[0]) return [from, to];
+    // GeoJSON coordinates — [lng, lat] → конвертуємо в [lat, lng]
+    return data.routes[0].geometry.coordinates.map(
+      ([lng, lat]: [number, number]) => [lat, lng] as [number, number]
+    );
+  } catch {
+    return [from, to]; // fallback — пряма лінія
+  }
+}
+
 export default function MapView({ line, locations, completedSlugs, activeSlug }: Props) {
-  if (!locations || locations.length === 0) return null;
+  const [routePoints, setRoutePoints] = useState<[number, number][]>([]);
+  const [routeLoading, setRouteLoading] = useState(true);
 
   const color     = LINE_COLOR[line];
   const positions = locations.map(l => [l.lat, l.lng] as [number, number]);
   const center    = positions[Math.floor(positions.length / 2)];
+
+  // Завантажуємо OSRM маршрут при mount
+  useEffect(() => {
+    if (locations.length < 2) {
+      setRoutePoints(positions);
+      setRouteLoading(false);
+      return;
+    }
+
+    async function loadRoute() {
+      setRouteLoading(true);
+      try {
+        // Один запит для всього маршруту
+        const coords = positions.map(([lat, lng]) => `${lng},${lat}`).join(';');
+        const url = `https://router.project-osrm.org/route/v1/foot/${coords}?overview=full&geometries=geojson`;
+        const res  = await fetch(url);
+        const data = await res.json();
+        if (data.code === 'Ok' && data.routes?.[0]) {
+          const pts = data.routes[0].geometry.coordinates.map(
+            ([lng, lat]: [number, number]) => [lat, lng] as [number, number]
+          );
+          setRoutePoints(pts);
+        } else {
+          setRoutePoints(positions);
+        }
+      } catch {
+        setRoutePoints(positions); // fallback
+      }
+      setRouteLoading(false);
+    }
+
+    loadRoute();
+  }, [locations]);
+
+  if (!locations || locations.length === 0) return null;
 
   return (
     <MapContainer
@@ -32,18 +88,27 @@ export default function MapView({ line, locations, completedSlugs, activeSlug }:
         attribution="© OpenStreetMap"
       />
 
-      <Polyline
-        positions={positions}
-        pathOptions={{ color, weight: 4, opacity: 0.85 }}
-      />
+      {/* Маршрут — по вулицях якщо завантажено, пряма лінія поки завантажується */}
+      {routeLoading ? (
+        // Placeholder — пряма лінія поки OSRM не відповів
+        <Polyline
+          positions={positions}
+          pathOptions={{ color, weight: 3, opacity: 0.4, dashArray: '6 6' }}
+        />
+      ) : (
+        <Polyline
+          positions={routePoints}
+          pathOptions={{ color, weight: 4, opacity: 0.9 }}
+        />
+      )}
 
+      {/* Маркери локацій */}
       {locations.map((loc, i) => {
         const done   = completedSlugs.includes(loc.slug);
         const active = loc.slug === activeSlug;
 
-        // Колір маркера залежить від типу і стану
         const markerColor =
-          done              ? '#9CA3AF' :
+          done                  ? '#9CA3AF' :
           loc.type === 'finish' ? '#7F77DD' :
           loc.type === 'shared' ? '#2D7A4F' :
           color;
