@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Session } from '@/types';
-import { getLineLocations, LINE_COLOR, LINE_LABEL } from '@/lib/utils';
+import { fetchLine, LINE_COLOR, LINE_LABEL } from '@/lib/utils';
 import HudzykMascot from '@/components/quest/HudzykMascot';
 import { getSession, clearSession, finishSession } from '@/lib/session';
 
