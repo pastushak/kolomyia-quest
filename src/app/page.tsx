@@ -220,6 +220,14 @@ export default function HomePage() {
           Розпочати квест →
         </button>
 
+        {isLoggedIn && (
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: 12 }}>
+            <a href="/profile" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#1a1a2e', fontWeight: 600, textDecoration: 'none', padding: '8px 16px', borderRadius: 20, border: '1.5px solid #EEEEF5', background: '#fff' }}>
+              👤 Мій профіль
+            </a>
+          </div>
+        )}
+
         <div style={{ display: 'flex', justifyContent: 'center', marginTop: 16 }}>
           <a
             href="/about/hudzyk"
