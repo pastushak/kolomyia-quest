@@ -83,8 +83,8 @@ export default function ShopPage() {
 
   const categories = data ? ['all', ...Array.from(new Set(data.items.map(i => i.category)))] : ['all'];
   const filtered   = data?.items.filter(i => filter === 'all' || i.category === filter) ?? [];
-  const infoItems  = filtered.filter(i => i.type === 'info');
-  const xpItems    = filtered.filter(i => i.type !== 'info');
+  const infoItems: ShopItem[] = [];
+  const xpItems = filtered;
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', flexDirection: 'column', gap: 12 }}>
@@ -230,17 +230,11 @@ function ShopCard({ item, userXp, redeemed, isLoggedIn, activating, onRedeem }: 
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        {item.type === 'info' ? (
-          <span style={{ fontSize: 12, color: '#888' }}>Інформаційна картка</span>
-        ) : (
-          <span style={{ fontSize: 12, fontWeight: 700, padding: '4px 10px', borderRadius: 10, background: '#f5e0e3', color: '#89182c' }}>
-            {item.discountText} · {item.xpCost} XP
-          </span>
-        )}
+        <span style={{ fontSize: 12, fontWeight: 700, padding: '4px 10px', borderRadius: 10, background: item.type === 'info' ? '#e8f0ff' : '#f5e0e3', color: item.type === 'info' ? '#2563EB' : '#89182c' }}>
+          {item.type === 'info' ? `Інфо · ${item.xpCost} XP` : `${item.discountText} · ${item.xpCost} XP`}
+        </span>
 
-        {item.type === 'info' ? (
-          <span style={{ fontSize: 12, color: '#2D7A4F', fontWeight: 600 }}>✓ Відкрита</span>
-        ) : redeemed ? (
+        {redeemed ? (
           <span style={{ fontSize: 12, fontWeight: 700, padding: '6px 14px', borderRadius: 12, background: '#E8F5EE', color: '#2D7A4F' }}>✓ Активовано</span>
         ) : !isLoggedIn ? (
           <button onClick={onRedeem} style={{ padding: '7px 14px', borderRadius: 12, border: 'none', background: '#89182c', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>

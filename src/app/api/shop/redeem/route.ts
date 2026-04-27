@@ -24,11 +24,6 @@ export async function POST(req: NextRequest) {
     }>();
     if (!item) return NextResponse.json({ error: 'Item not found' }, { status: 404 });
 
-    // Info картки не потребують активації
-    if (item.type === 'info') {
-      return NextResponse.json({ error: 'Info cards do not require redemption' }, { status: 400 });
-    }
-
     // Перевіряємо чи вже активовано
     const existing = await RedemptionModel.findOne({ userId: session.user.id, itemId });
     if (existing) {
