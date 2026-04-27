@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import { getSession, Session } from '@/lib/session';
+import { getSession } from '@/lib/session';
+import { Session } from '@/types';
 import { LINE_COLOR, LINE_LABEL } from '@/lib/utils';
 import { Line, Location } from '@/types';
 import HudzykMascot from '@/components/quest/HudzykMascot';
