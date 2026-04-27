@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { Line, QuestLine } from '@/types';
-import { createSession } from '@/lib/session';
+import { createSession, getSession } from '@/lib/session';
 import { LINE_EMOJI } from '@/lib/utils';
 import HudzykMascot from '@/components/quest/HudzykMascot';
 
@@ -19,6 +19,7 @@ export default function HomePage() {
 
   const [phase, setPhase]           = useState<Phase>('splash');
   const [splashOut, setSplashOut]   = useState(false);
+  const hasSeenIntro = typeof window !== 'undefined' && sessionStorage.getItem('kq_intro_seen');
   const [selectedLine, setSelectedLine] = useState<Line | null>(null);
   const [lines, setLines]           = useState<QuestLine[]>([]);
   const [linesLoading, setLinesLoading] = useState(true);
@@ -27,6 +28,11 @@ export default function HomePage() {
 
   // Заставка — 1.5с потім fade out
   useEffect(() => {
+    if (hasSeenIntro) {
+      setSplashOut(true);
+      setPhase('form');
+      return;
+    }
     const t1 = setTimeout(() => setSplashOut(true), 1500);
     const t2 = setTimeout(() => setPhase('greeting'), 2000);
     return () => { clearTimeout(t1); clearTimeout(t2); };
@@ -47,15 +53,30 @@ export default function HomePage() {
     }
   }, [session]);
 
+  useEffect(() => {
+    setExistingSession(getSession());
+  }, []);
+
   async function handleStart() {
     if (!nickname.trim()) { setError('Введи своє ім\'я'); return; }
     if (!selectedLine)    { setError('Обери маршрут'); return; }
+
+    // Перевіряємо чи є незавершена сесія для цієї лінії
+    const existing = getSession();
+    if (existing && existing.line === selectedLine) {
+      // Продовжуємо існуючу сесію
+      router.push(`/start/${selectedLine}`);
+      return;
+    }
+
     await createSession(nickname.trim(), selectedLine, 'adults', session?.user?.id);
     router.push(`/start/${selectedLine}`);
   }
 
   const cfg = lines.find(l => l.key === selectedLine);
   const isLoggedIn = status === 'authenticated';
+  const [existingSession, setExistingSession] = useState<ReturnType<typeof getSession>>(null);
+  const hasActiveSession = existingSession && existingSession.completedSlugs.length > 0;
 
   // ── ФАЗА 1: Заставка ─────────────────────────────────────
   if (phase === 'splash') {
@@ -135,7 +156,7 @@ export default function HomePage() {
           </div>
 
           <button
-            onClick={() => setPhase('video')}
+            onClick={() => { sessionStorage.setItem('kq_intro_seen', '1'); setPhase('video'); }}
             style={{
               width: '100%', padding: '16px', borderRadius: 16, border: 'none',
               background: '#fff', color: '#89182c', fontSize: 16, fontWeight: 800,
@@ -147,7 +168,7 @@ export default function HomePage() {
           </button>
 
           <button
-            onClick={() => setPhase('form')}
+            onClick={() => { sessionStorage.setItem('kq_intro_seen', '1'); setPhase('form'); }}
             style={{
               width: '100%', padding: '12px', borderRadius: 16,
               border: '1.5px solid rgba(255,255,255,0.3)', background: 'transparent',
@@ -200,14 +221,14 @@ export default function HomePage() {
               autoPlay
               playsInline
               controls
-              onEnded={() => setPhase('form')}
+              onEnded={() => { sessionStorage.setItem('kq_intro_seen', '1'); setPhase('form'); }}
               style={{ width: '100%', display: 'block', maxHeight: '55vh', objectFit: 'cover' }}
             />
           </div>
 
           {/* Кнопки */}
           <button
-            onClick={() => setPhase('form')}
+            onClick={() => { sessionStorage.setItem('kq_intro_seen', '1'); setPhase('form'); }}
             style={{
               width: '100%', padding: '14px', borderRadius: 16,
               border: '1.5px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.08)',
@@ -380,6 +401,12 @@ export default function HomePage() {
             </p>
           )}
         </div>
+
+        {hasActiveSession && existingSession.line === selectedLine && (
+          <div style={{ background: '#E8F5EE', borderRadius: 12, padding: '10px 14px', marginBottom: 12, fontSize: 13, color: '#2D7A4F', fontWeight: 600 }}>
+            ✓ Продовжиш з {existingSession.completedSlugs.length} пройдених точок
+          </div>
+        )}
 
         {/* Кнопка старту */}
         <button
