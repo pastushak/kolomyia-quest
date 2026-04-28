@@ -545,14 +545,14 @@ export default function AdminPage() {
               ].map(item => <QRItem key={item.url} {...item} />)}
             </div>
 
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#555', marginBottom: 14 }}>Локації — розмістити на об'єктах</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#555', marginBottom: 14 }}>Локації — розмістити на об'єктах (детальна інформація)</div>
             {spotsLoading ? (
               <div style={{ color: '#888', fontSize: 14 }}>Завантаження...</div>
             ) : (
               <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                 {spots.map(spot => {
                   const color = spot.type === 'finish' ? '#7F77DD' : LINE_COLOR[spot.lines[0] as Line] ?? '#888';
-                  return <QRItem key={spot.slug} url={`${BASE_URL}/spot/${spot.slug}`} label={spot.name} sublabel={spot.address} color={color} />;
+                  return <QRItem key={spot.slug} url={`${BASE_URL}/info/${spot.slug}`} label={spot.name} sublabel={spot.address} color={color} />;
                 })}
               </div>
             )}
