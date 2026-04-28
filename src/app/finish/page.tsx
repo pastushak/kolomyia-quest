@@ -7,12 +7,17 @@ import { fetchLine, LINE_COLOR, LINE_LABEL } from '@/lib/utils';
 import HudzykMascot from '@/components/quest/HudzykMascot';
 import { getSession, clearSession, finishSession } from '@/lib/session';
 
+const FINISH_VIDEO_URL = 'https://www.dropbox.com/scl/fi/c8sf988efo3af425c7ota/video_finish.mp4?rlkey=i56zp7qtcjdnce7nslg3ttslz&st=4130feym&raw=1';
+
+type Phase = 'video' | 'results';
+
 export default function FinishPage() {
   const router = useRouter();
-  const [session, setSession] = useState<Session | null>(null);
-  const [visible, setVisible] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const [session, setSession]   = useState<Session | null>(null);
+  const [visible, setVisible]   = useState(false);
+  const [mounted, setMounted]   = useState(false);
   const [lineSpots, setLineSpots] = useState<{ slug: string; name: string }[]>([]);
+  const [phase, setPhase]       = useState<Phase>('video');
 
   useEffect(() => {
     setMounted(true);
@@ -20,20 +25,22 @@ export default function FinishPage() {
     if (!s) { router.push('/'); return; }
     setSession(s);
     finishSession();
-    setTimeout(() => setVisible(true), 100);
     fetchLine(s.line).then(data => setLineSpots(data.spots));
   }, []);
+
+  function goToResults() {
+    setPhase('results');
+    setTimeout(() => setVisible(true), 100);
+  }
 
   if (!mounted || !session) return null;
 
   const line      = session.line;
   const color     = LINE_COLOR[line];
   const label     = LINE_LABEL[line];
-  const allLocs   = lineSpots;
   const completed = session.completedSlugs.length;
-  const total     = allLocs.length;
+  const total     = lineSpots.length;
   const xp        = session.xp;
-
   const startedAt  = new Date(session.startedAt);
   const finishedAt = new Date();
   const minutes    = Math.round((finishedAt.getTime() - startedAt.getTime()) / 60000);
@@ -43,6 +50,60 @@ export default function FinishPage() {
     router.push('/');
   }
 
+  // ── ФАЗА 1: Відео з Ниточкою ─────────────────────────────
+  if (phase === 'video') {
+    return (
+      <main style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(160deg, #89182c 0%, #3d0a12 100%)',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        padding: '24px 16px',
+      }}>
+        <div style={{ width: '100%', maxWidth: 420 }}>
+
+          {/* Ґудзик з повідомленням */}
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+            <HudzykMascot mood="celebrate" message="Ниточка знайдена! 🐱" size={120} />
+          </div>
+
+          <div style={{ textAlign: 'center', marginBottom: 20 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>
+              Місія виконана
+            </div>
+            <div style={{ fontSize: 26, fontWeight: 900, color: '#fff', lineHeight: 1.2, marginBottom: 8 }}>
+              Ниточка врятована! 🐱
+            </div>
+            <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6 }}>
+              Дякуємо, <strong style={{ color: '#f5c04a' }}>{session.nickname}</strong>!<br />
+              Завдяки тобі Ґудзик знову разом зі своєю подругою.
+            </div>
+          </div>
+
+          {/* Відео */}
+          <div style={{ borderRadius: 24, overflow: 'hidden', border: '2px solid rgba(255,255,255,0.15)', background: '#000', marginBottom: 16, boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}>
+            <video
+              src={FINISH_VIDEO_URL}
+              autoPlay
+              playsInline
+              controls
+              onEnded={goToResults}
+              style={{ width: '100%', display: 'block', maxHeight: '45vh', objectFit: 'cover' }}
+            />
+          </div>
+
+          <button
+            onClick={goToResults}
+            style={{ width: '100%', padding: '14px', borderRadius: 16, border: '1.5px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+          >
+            Переглянути результати →
+          </button>
+
+        </div>
+      </main>
+    );
+  }
+
+  // ── ФАЗА 2: Результати ────────────────────────────────────
   return (
     <main style={{ minHeight: '100vh', background: '#F7F7FC', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 16px' }}>
       <div style={{
@@ -102,10 +163,10 @@ export default function FinishPage() {
           <div style={{ padding: '14px 18px', borderBottom: '1px solid #EEEEF5', fontSize: 13, fontWeight: 700, color: '#8888A8' }}>
             Маршрут пройдено
           </div>
-          {allLocs.map((loc, i) => {
+          {lineSpots.map((loc, i) => {
             const done = session.completedSlugs.includes(loc.slug);
             return (
-              <div key={loc.slug} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 18px', borderBottom: i < allLocs.length - 1 ? '1px solid #EEEEF5' : 'none' }}>
+              <div key={loc.slug} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 18px', borderBottom: i < lineSpots.length - 1 ? '1px solid #EEEEF5' : 'none' }}>
                 <div style={{ width: 24, height: 24, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: done ? '#fff' : '#8888A8', background: done ? color : '#EEEEF5' }}>
                   {done ? '✓' : i + 1}
                 </div>
@@ -117,6 +178,16 @@ export default function FinishPage() {
           })}
         </div>
 
+        {/* Магазин привілеїв */}
+        <div style={{ background: 'linear-gradient(135deg, #1a1a2e, #2d1f4e)', borderRadius: 20, padding: '20px 24px', display: 'flex', alignItems: 'center', gap: 16, cursor: 'pointer' }} onClick={() => router.push('/shop')}>
+          <div style={{ fontSize: 32 }}>🏪</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', marginBottom: 3 }}>Привілеї мандрівника</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>Витрать {xp} XP на знижки в закладах міста</div>
+          </div>
+          <div style={{ fontSize: 18, color: '#f5c04a' }}>→</div>
+        </div>
+
         {/* Кнопки */}
         <button onClick={handleRestart} style={{ width: '100%', padding: 16, borderRadius: 16, border: 'none', background: color, color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer' }}>
           Пройти ще раз →
@@ -125,18 +196,11 @@ export default function FinishPage() {
         <button onClick={() => { clearSession(); router.push('/'); }} style={{ width: '100%', padding: 14, borderRadius: 16, border: '1.5px solid #EEEEF5', background: '#fff', color: '#8888A8', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
           Спробувати іншу лінію
         </button>
-        <a href="/about/hudzyk"
-          style={{
-            display: 'block', width: '100%', padding: 14,
-            borderRadius: 16, border: '1.5px solid #f5e0e3',
-            background: '#fff', color: '#89182c', fontSize: 14,
-            fontWeight: 600, cursor: 'pointer', textAlign: 'center',
-            textDecoration: 'none', marginTop: 8,
-          }}
-        >
+
+        <a href="/about/hudzyk" style={{ display: 'block', width: '100%', padding: 14, borderRadius: 16, border: '1.5px solid #f5e0e3', background: '#fff', color: '#89182c', fontSize: 14, fontWeight: 600, cursor: 'pointer', textAlign: 'center', textDecoration: 'none' }}>
           🐾 Дізнатись про кота Ґудзика
         </a>
-      
+
         <p style={{ textAlign: 'center', fontSize: 12, color: '#8888A8', margin: 0 }}>
           Коломия єднає · kolomyia-quest
         </p>

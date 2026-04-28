@@ -8,7 +8,7 @@ import { createSession, getSession } from '@/lib/session';
 import { LINE_EMOJI } from '@/lib/utils';
 import HudzykMascot from '@/components/quest/HudzykMascot';
 
-const VIDEO_URL = 'https://www.dropbox.com/scl/fi/df7n93rhvm1wm8q7plw8m/cat_kolomyia.mp4?rlkey=tjk0b4b4suj5ohnd62tksa363&st=jym6vnqe&raw=1';
+const VIDEO_URL = 'https://www.dropbox.com/scl/fi/gf1gta8sh58crr51sv0vg/video_start.mp4?rlkey=hzwinaii2oxv6djxapv4t1s6e&st=wu9rbqgn&raw=1';
 
 type Phase = 'splash' | 'greeting' | 'video' | 'form';
 
