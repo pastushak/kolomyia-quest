@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { getSession, completeSpot, trackQrScan } from '@/lib/session';
+import { getSession, completeSpot, trackQrScan, switchLine } from '@/lib/session';
 import { LINE_COLOR, LINE_LABEL, getNextSlug, getQuizForLine } from '@/lib/utils';
 import { Location } from '@/types';
 import HudzykMascot from '@/components/quest/HudzykMascot';
@@ -173,17 +173,46 @@ export default function SpotPage() {
           )
         )}
 
-        {/* Пересадки — показуємо якщо є transfers */}
-        {spot.transfers.length > 0 && stage === 'quiz' && (
-          <div style={{ marginTop: 12, background: '#FEF7E6', border: '1px solid #F5D78A', borderRadius: 14, padding: '12px 16px' }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#8B6914', marginBottom: 4 }}>
-              🚇 Пересадка доступна
+        {/* Пересадки */}
+        {spot.transfers.length > 0 && (
+          <div style={{ marginTop: 16, background: '#fff', border: '1px solid #EEEEF5', borderRadius: 20, padding: '18px 16px' }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#8B6914', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+              🚇 Пересадка доступна з цієї точки
             </div>
-            <div style={{ fontSize: 13, color: '#633806' }}>
-              З цієї станції можна пересісти на:{' '}
-              {spot.transfers.map(t => (
-                <strong key={t} style={{ color: LINE_COLOR[t] }}>{LINE_LABEL[t]}</strong>
-              )).reduce((acc: any, el, i) => i === 0 ? [el] : [...acc, ', ', el], [])}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {spot.transfers
+                .filter(t => t !== line)
+                .map(t => (
+                  <button
+                    key={t}
+                    onClick={() => {
+                      if (confirm(`Пересісти на ${LINE_LABEL[t]}? Твій поточний прогрес збережеться.`)) {
+                        fetch(`/api/lines/${t}`)
+                          .then(r => r.json())
+                          .then(data => {
+                            switchLine(t as any, slug, data.order);
+                            router.push(`/start/${t}`);
+                          });
+                      }
+                    }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 12,
+                      padding: '12px 14px', borderRadius: 14, border: `2px solid ${LINE_COLOR[t]}20`,
+                      background: LINE_COLOR[t] + '10', cursor: 'pointer', textAlign: 'left',
+                    }}
+                  >
+                    <div style={{ width: 12, height: 12, borderRadius: '50%', background: LINE_COLOR[t], flexShrink: 0 }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: LINE_COLOR[t] }}>
+                        {LINE_LABEL[t]}
+                      </div>
+                      <div style={{ fontSize: 11, color: '#8888A8' }}>
+                        Натисни щоб пересісти на цю лінію
+                      </div>
+                    </div>
+                    <span style={{ fontSize: 18 }}>→</span>
+                  </button>
+                ))}
             </div>
           </div>
         )}

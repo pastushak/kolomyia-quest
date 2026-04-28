@@ -143,3 +143,24 @@ export async function trackQrScan(slug: string): Promise<void> {
     userAgent: navigator.userAgent,
   });
 }
+
+export function switchLine(newLine: Line, fromSlug?: string, newLineOrder?: string[]): void {
+  const session = getSession();
+  if (!session) return;
+  session.line = newLine;
+
+  // Додаємо всі точки нової лінії до точки пересадки включно
+  if (fromSlug && newLineOrder) {
+    const transferIndex = newLineOrder.indexOf(fromSlug);
+    if (transferIndex !== -1) {
+      const slugsToComplete = newLineOrder.slice(0, transferIndex + 1);
+      slugsToComplete.forEach(slug => {
+        if (!session.completedSlugs.includes(slug)) {
+          session.completedSlugs.push(slug);
+        }
+      });
+    }
+  }
+
+  localStorage.setItem(KEY, JSON.stringify(session));
+}
