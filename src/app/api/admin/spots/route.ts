@@ -32,7 +32,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     // Дозволяємо оновлювати тільки безпечні поля
-    const allowed = ['info', 'qrHint', 'quizzes', 'address'];
+    const allowed = ['info', 'fullInfo', 'qrHint', 'quizzes', 'address'];
     const filtered = Object.fromEntries(
       Object.entries(updates).filter(([k]) => allowed.includes(k)),
     );

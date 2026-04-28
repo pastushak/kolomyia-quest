@@ -25,7 +25,8 @@ const SpotSchema = new Schema(
     lng:     { type: Number, required: true },
     address: { type: String, default: '' },
     qrHint:  { type: String, default: '' },
-    info:    { type: String, default: '' },
+    info:     { type: String, default: '' },
+    fullInfo: { type: String, default: '' },
 
     // Тип локації на маршруті
     type: {

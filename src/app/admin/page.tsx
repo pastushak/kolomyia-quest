@@ -34,6 +34,7 @@ interface SpotData {
   name:      string;
   address:   string;
   info:      string;
+  fullInfo:  string;
   qrHint:    string;
   type:      string;
   lines:     string[];
@@ -135,7 +136,7 @@ export default function AdminPage() {
     setSpotsLoading(true);
     const res  = await fetch('/api/admin/spots');
     const data = await res.json();
-    setSpots(data);
+    setSpots(Array.isArray(data) ? data : []);
     setSpotsLoading(false);
   }
 
@@ -165,7 +166,7 @@ export default function AdminPage() {
     setShopLoading(true);
     const res  = await fetch('/api/admin/shop');
     const data = await res.json();
-    setShopItems(data);
+    setShopItems(Array.isArray(data) ? data : []);
     setShopLoading(false);
   }
 
@@ -175,7 +176,7 @@ export default function AdminPage() {
     const filledQuizzes = (editing.quizzes || []).filter(isQuizFilled);
     await fetch('/api/admin/spots', {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slug: editing.slug, info: editing.info, qrHint: editing.qrHint, address: editing.address, quizzes: filledQuizzes.length > 0 ? filledQuizzes : null }),
+      body: JSON.stringify({ slug: editing.slug, info: editing.info, fullInfo: editing.fullInfo, qrHint: editing.qrHint, address: editing.address, quizzes: filledQuizzes.length > 0 ? filledQuizzes : null }),
     });
     setSaving(false); setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -458,7 +459,8 @@ export default function AdminPage() {
 
                   {[
                     { label: 'Адреса',      key: 'address', rows: 1 },
-                    { label: 'Опис місця',  key: 'info',    rows: 5 },
+                    { label: 'Коротке прев\'ю (7-8 речень)', key: 'info',     rows: 4 },
+                    { label: 'Розширена інформація (для /info/[slug])', key: 'fullInfo', rows: 10 },
                     { label: 'Підказка QR', key: 'qrHint',  rows: 2 },
                   ].map(({ label, key, rows }) => (
                     <div key={key} style={{ marginBottom: 16 }}>
