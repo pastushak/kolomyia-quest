@@ -58,13 +58,13 @@ export default function HudzykPage() {
       </div>
 
       {/* Контент */}
-      <div style={{ maxWidth: 480, margin: '0 auto', padding: '0 16px', marginTop: -20 }}>
+      <div style={{ maxWidth: 480, margin: '0 auto', padding: '0 16px', marginTop: 16 }}>
 
         {/* Автор */}
         <div style={card}>
           <div style={label}>Автор бренду</div>
           <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-            <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'linear-gradient(135deg, #89182c, #e28f27)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>🎨</div>
+            <img src="/loburak.jpg" alt="Олег Лобурак" style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
             <div>
               <div style={{ fontSize: 16, fontWeight: 700, color: '#1a1a2e', marginBottom: 2 }}>Олег Лобурак</div>
               <div style={{ fontSize: 12, color: '#888', marginBottom: 8 }}>Художник, скульптор, письменник · Коломия</div>
@@ -103,10 +103,7 @@ export default function HudzykPage() {
         <div style={card}>
           <div style={label}>Пам'ятник у парку</div>
           <h2 style={title}>Кіт зі скрипкою і чарівним ґудзиком</h2>
-          <div style={{ width: '100%', height: 180, background: 'linear-gradient(135deg, #f5e0e3, #fdf0d9)', borderRadius: 14, marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 8, border: '2px dashed #e0c8cc' }}>
-            <span style={{ fontSize: 36, opacity: 0.4 }}>📷</span>
-            <span style={{ fontSize: 11, color: '#89182c', opacity: 0.6, fontWeight: 600 }}>Фото скульптури — незабаром</span>
-          </div>
+          <img src="/kit-sculpture.jpg" alt="Пам'ятник котові Ґудзику" style={{ width: '100%', borderRadius: 14, marginBottom: 14, objectFit: 'cover', maxHeight: 280 }} />
           <p style={text}>Бронзова скульптура заввишки 1,20 м стоїть у центрі парку імені Кирила Трильовського. Кіт у гуцульській крисані грає на скрипці. На поясі — чарівний ґудзик.</p>
           <p style={text}>За легендою: якщо потерти ґудзик на поясі — бажання здійсниться. Туристи з усього світу приходять саме за цим. 🐾</p>
         </div>
