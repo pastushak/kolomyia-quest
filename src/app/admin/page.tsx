@@ -177,7 +177,7 @@ export default function AdminPage() {
     const filledQuizzes = (editing.quizzes || []).filter(isQuizFilled);
     await fetch('/api/admin/spots', {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slug: editing.slug, info: editing.info, fullInfo: editing.fullInfo, qrHint: editing.qrHint, address: editing.address, quizzes: filledQuizzes.length > 0 ? filledQuizzes : null }),
+      body: JSON.stringify({ slug: editing.slug, info: editing.info, fullInfo: editing.fullInfo, audioUrl: editing.audioUrl, qrHint: editing.qrHint, address: editing.address, quizzes: filledQuizzes.length > 0 ? filledQuizzes : null }),
     });
     setSaving(false); setSaved(true);
     setTimeout(() => setSaved(false), 2000);
