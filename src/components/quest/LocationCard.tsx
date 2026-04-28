@@ -1,22 +1,80 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
+
 interface Props {
-  name: string;
-  address: string;
-  info: string;
-  qrHint: string;
-  spotNumber: number;
-  totalSpots: number;
-  lineColor: string;
-  onReady: () => void;
-  onScan: () => void;
+  name:        string;
+  address:     string;
+  info:        string;
+  audioUrl?:   string;
+  qrHint:      string;
+  spotNumber:  number;
+  totalSpots:  number;
+  lineColor:   string;
+  onReady:     () => void;
+  onScan:      () => void;
 }
 
-export default function LocationCard({ name, address, info, qrHint, spotNumber, totalSpots, lineColor, onReady, onScan }: Props) {
+export default function LocationCard({ name, address, info, audioUrl, qrHint, spotNumber, totalSpots, lineColor, onReady, onScan }: Props) {
+  const audioRef  = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying]   = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [loaded, setLoaded]     = useState(false);
+
+  // Автозапуск при відкритті
+  useEffect(() => {
+    if (!audioUrl || !audioRef.current) return;
+    const audio = audioRef.current;
+
+    audio.addEventListener('loadedmetadata', () => {
+      setDuration(audio.duration);
+      setLoaded(true);
+      // Автозапуск з невеликою затримкою
+      setTimeout(() => {
+        audio.play().then(() => setPlaying(true)).catch(() => {});
+      }, 800);
+    });
+
+    audio.addEventListener('timeupdate', () => {
+      setProgress(audio.currentTime / audio.duration * 100);
+    });
+
+    audio.addEventListener('ended', () => {
+      setPlaying(false);
+      setProgress(0);
+    });
+  }, [audioUrl]);
+
+  function togglePlay() {
+    if (!audioRef.current) return;
+    if (playing) {
+      audioRef.current.pause();
+      setPlaying(false);
+    } else {
+      audioRef.current.play().then(() => setPlaying(true)).catch(() => {});
+    }
+  }
+
+  function handleSeek(e: React.MouseEvent<HTMLDivElement>) {
+    if (!audioRef.current || !duration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x    = e.clientX - rect.left;
+    const pct  = x / rect.width;
+    audioRef.current.currentTime = pct * duration;
+  }
+
+  function formatTime(sec: number) {
+    if (!sec || isNaN(sec)) return '0:00';
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-      {/* Прогрес */}
+      {/* Прогрес маршруту */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{ flex: 1, height: 6, background: '#EEEEF5', borderRadius: 3, overflow: 'hidden' }}>
           <div style={{ height: '100%', width: `${(spotNumber / totalSpots) * 100}%`, background: lineColor, borderRadius: 3, transition: 'width .4s' }} />
@@ -34,6 +92,53 @@ export default function LocationCard({ name, address, info, qrHint, spotNumber, 
         </h1>
         <p style={{ fontSize: 13, color: '#8888A8', margin: 0 }}>{address}</p>
       </div>
+
+      {/* Аудіоплеєр — показується тільки якщо є audioUrl */}
+      {audioUrl && (
+        <div style={{ background: '#fff', borderRadius: 20, border: `1.5px solid ${lineColor}30`, padding: '16px 20px' }}>
+          <audio ref={audioRef} src={audioUrl} preload="metadata" />
+
+          <div style={{ fontSize: 12, fontWeight: 700, color: lineColor, textTransform: 'uppercase', letterSpacing: .8, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+            🎧 Аудіо-розповідь
+            {playing && (
+              <span style={{ display: 'inline-flex', gap: 2, alignItems: 'flex-end', height: 14 }}>
+                {[1, 2, 3].map(i => (
+                  <span key={i} style={{ width: 3, background: lineColor, borderRadius: 2, animation: `wave${i} 0.8s ease-in-out infinite`, display: 'inline-block' }} />
+                ))}
+                <style>{`
+                  @keyframes wave1 { 0%,100%{height:4px} 50%{height:12px} }
+                  @keyframes wave2 { 0%,100%{height:8px} 50%{height:4px} }
+                  @keyframes wave3 { 0%,100%{height:4px} 50%{height:10px} }
+                `}</style>
+              </span>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {/* Кнопка play/pause */}
+            <button
+              onClick={togglePlay}
+              style={{ width: 44, height: 44, borderRadius: '50%', border: 'none', background: lineColor, color: '#fff', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+            >
+              {playing ? '⏸' : '▶'}
+            </button>
+
+            {/* Прогрес */}
+            <div style={{ flex: 1 }}>
+              <div
+                onClick={handleSeek}
+                style={{ height: 6, background: '#EEEEF5', borderRadius: 3, overflow: 'hidden', cursor: 'pointer', marginBottom: 4 }}
+              >
+                <div style={{ height: '100%', width: `${progress}%`, background: lineColor, borderRadius: 3, transition: 'width .1s linear' }} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#8888A8' }}>
+                <span>{formatTime(audioRef.current?.currentTime ?? 0)}</span>
+                <span>{formatTime(duration)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Довідка */}
       <div style={{ background: '#fff', borderRadius: 20, border: '1px solid #EEEEF5', padding: 20 }}>
@@ -57,25 +162,18 @@ export default function LocationCard({ name, address, info, qrHint, spotNumber, 
       {/* Кнопки */}
       <button
         onClick={onReady}
-        style={{
-          width: '100%', padding: 16, borderRadius: 16, border: 'none',
-          background: lineColor, color: '#fff', fontSize: 16, fontWeight: 700,
-          cursor: 'pointer', marginBottom: 10,
-        }}
+        style={{ width: '100%', padding: 16, borderRadius: 16, border: 'none', background: lineColor, color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer', marginBottom: 10 }}
       >
         Я на місці — починаю квіз →
       </button>
 
       <button
         onClick={onScan}
-        style={{
-          width: '100%', padding: 13, borderRadius: 16, cursor: 'pointer',
-          border: `1.5px solid ${lineColor}`, background: 'transparent',
-          color: lineColor, fontSize: 14, fontWeight: 600,
-        }}
+        style={{ width: '100%', padding: 13, borderRadius: 16, cursor: 'pointer', border: `1.5px solid ${lineColor}`, background: 'transparent', color: lineColor, fontSize: 14, fontWeight: 600 }}
       >
         Сканувати QR-код
       </button>
+
     </div>
   );
 }

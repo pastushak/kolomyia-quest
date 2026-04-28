@@ -37,6 +37,7 @@ export interface Location {
   address:   string;
   qrHint:    string;
   info:      string;
+  audioUrl?: string;
   type:      LocationType;
 
   // Яким лініям належить спот

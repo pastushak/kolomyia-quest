@@ -34,6 +34,7 @@ interface SpotData {
   name:      string;
   address:   string;
   info:      string;
+  audioUrl:  string;
   fullInfo:  string;
   qrHint:    string;
   type:      string;
@@ -461,6 +462,7 @@ export default function AdminPage() {
                     { label: 'Адреса',      key: 'address', rows: 1 },
                     { label: 'Коротке прев\'ю (7-8 речень)', key: 'info',     rows: 4 },
                     { label: 'Розширена інформація (для /info/[slug])', key: 'fullInfo', rows: 10 },
+                    { label: 'Аудіо URL (Dropbox ?raw=1)', key: 'audioUrl', rows: 1 },
                     { label: 'Підказка QR', key: 'qrHint',  rows: 2 },
                   ].map(({ label, key, rows }) => (
                     <div key={key} style={{ marginBottom: 16 }}>

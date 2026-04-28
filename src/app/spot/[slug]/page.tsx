@@ -143,6 +143,7 @@ export default function SpotPage() {
             name={spot.name}
             address={spot.address}
             info={spot.info}
+            audioUrl={spot.audioUrl}
             qrHint={spot.qrHint}
             spotNumber={spotNumber}
             totalSpots={order.length}

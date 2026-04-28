@@ -26,6 +26,7 @@ const SpotSchema = new Schema(
     address: { type: String, default: '' },
     qrHint:  { type: String, default: '' },
     info:     { type: String, default: '' },
+    audioUrl: { type: String, default: '' },
     fullInfo: { type: String, default: '' },
 
     // Тип локації на маршруті
