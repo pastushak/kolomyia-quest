@@ -79,11 +79,19 @@ export default function SpotPage() {
   const hudzykMood  = stage === 'quiz' ? 'curious' : 'guide';
   const hudzykMsg   = stage === 'quiz' ? 'Відповідай!' : `Точка ${spotNumber}!`;
 
-  function handleQrScan(url: string) {
+  function handleQrScan(text: string) {
     setShowScanner(false);
     try {
-      const parts = new URL(url).pathname.split('/');
-      const scannedSlug = parts[parts.length - 1];
+      // Спробуємо розпарсити як URL
+      let scannedSlug = text.trim();
+      if (text.startsWith('http')) {
+        const parts = new URL(text).pathname.split('/').filter(Boolean);
+        scannedSlug = parts[parts.length - 1];
+      }
+      // Якщо slug містить /spot/ або /info/ — беремо останню частину
+      if (scannedSlug.includes('/')) {
+        scannedSlug = scannedSlug.split('/').filter(Boolean).pop() ?? scannedSlug;
+      }
       if (scannedSlug === slug) setStage('quiz');
       else router.push(`/spot/${scannedSlug}`);
     } catch { alert('Невірний QR-код'); }

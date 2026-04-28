@@ -147,7 +147,7 @@ export default function InfoPage() {
             <div style={{ fontSize: 11, color: '#888' }}>Інтерактивна квест-карта міста Коломиї</div>
           </div>
           <a
-            href="/"
+            href={`/spot/${slug}`}
             style={{ marginLeft: 'auto', padding: '7px 14px', borderRadius: 20, border: '1.5px solid #f5e0e3', background: '#fff', color: '#89182c', fontSize: 12, fontWeight: 700, textDecoration: 'none', flexShrink: 0 }}
           >
             До квесту →
