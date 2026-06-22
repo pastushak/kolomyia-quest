@@ -26,6 +26,16 @@ export default function StartPage() {
     setMounted(true);
     const s = getSession();
     if (!s) { router.push('/'); return; }
+
+    // Захист від застарілих сесій на неіснуючій лінії (доміграційні red/blue)
+    const VALID_LINES = ['cherry', 'orange', 'green'];
+    if (!VALID_LINES.includes(s.line) || s.line !== line) {
+      // Лінія сесії не збігається з URL або взагалі недійсна — скидаємо
+      localStorage.removeItem('kq_session');
+      localStorage.removeItem('kq_sid');
+      router.push('/');
+      return;
+    }
     setSession(s);
 
     fetch(`/api/lines/${line}`)

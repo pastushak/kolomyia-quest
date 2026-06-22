@@ -6,30 +6,16 @@ import { Line, Location } from '@/types';
 import { LINE_COLOR } from '@/lib/utils';
 import 'leaflet/dist/leaflet.css';
 
+// Базовий URL маршрутизатора. Замінити на власний OSRM/провайдер перед лончем —
+// публічний demo має жорсткі ліміти й нестабільний.
+const OSRM_BASE = 'https://router.project-osrm.org';
+const OSRM_TIMEOUT_MS = 6000;
+
 interface Props {
   line:           Line;
   locations:      Location[];
   completedSlugs: string[];
   activeSlug?:    string;
-}
-
-// Запит до OSRM — повертає масив координат по вулицях між двома точками
-async function fetchOsrmRoute(
-  from: [number, number],
-  to:   [number, number],
-): Promise<[number, number][]> {
-  try {
-    const url = `https://router.project-osrm.org/route/v1/foot/${from[1]},${from[0]};${to[1]},${to[0]}?overview=full&geometries=geojson`;
-    const res  = await fetch(url);
-    const data = await res.json();
-    if (data.code !== 'Ok' || !data.routes?.[0]) return [from, to];
-    // GeoJSON coordinates — [lng, lat] → конвертуємо в [lat, lng]
-    return data.routes[0].geometry.coordinates.map(
-      ([lng, lat]: [number, number]) => [lat, lng] as [number, number]
-    );
-  } catch {
-    return [from, to]; // fallback — пряма лінія
-  }
 }
 
 export default function MapView({ line, locations, completedSlugs, activeSlug }: Props) {
@@ -40,8 +26,14 @@ export default function MapView({ line, locations, completedSlugs, activeSlug }:
   const positions = locations.map(l => [l.lat, l.lng] as [number, number]);
   const center    = positions[Math.floor(positions.length / 2)];
 
-  // Завантажуємо OSRM маршрут при mount
+  // Стабільний "відбиток" точок — щоб ефект не перезапускався на кожен ререндер
+  // через нову референцію масиву locations.
+  const routeKey = locations.map(l => `${l.lat},${l.lng}`).join('|');
+
+  // Завантажуємо OSRM маршрут при зміні набору точок
   useEffect(() => {
+    let cancelled = false;
+
     if (locations.length < 2) {
       setRoutePoints(positions);
       setRouteLoading(false);
@@ -50,28 +42,41 @@ export default function MapView({ line, locations, completedSlugs, activeSlug }:
 
     async function loadRoute() {
       setRouteLoading(true);
+
+      // Таймаут через AbortController — щоб не висіти на повільному demo-сервері
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), OSRM_TIMEOUT_MS);
+
       try {
-        // Один запит для всього маршруту
         const coords = positions.map(([lat, lng]) => `${lng},${lat}`).join(';');
-        const url = `https://router.project-osrm.org/route/v1/foot/${coords}?overview=full&geometries=geojson`;
-        const res  = await fetch(url);
+        const url = `${OSRM_BASE}/route/v1/foot/${coords}?overview=full&geometries=geojson`;
+        const res  = await fetch(url, { signal: controller.signal });
         const data = await res.json();
+
+        if (cancelled) return;
+
         if (data.code === 'Ok' && data.routes?.[0]) {
           const pts = data.routes[0].geometry.coordinates.map(
             ([lng, lat]: [number, number]) => [lat, lng] as [number, number]
           );
           setRoutePoints(pts);
         } else {
-          setRoutePoints(positions);
+          setRoutePoints(positions); // fallback — прямі лінії
         }
       } catch {
-        setRoutePoints(positions); // fallback
+        // Таймаут або помилка мережі — малюємо прямі лінії, карта не висить
+        if (!cancelled) setRoutePoints(positions);
+      } finally {
+        clearTimeout(timer);
+        if (!cancelled) setRouteLoading(false);
       }
-      setRouteLoading(false);
     }
 
     loadRoute();
-  }, [locations]);
+
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeKey]);
 
   if (!locations || locations.length === 0) return null;
 
