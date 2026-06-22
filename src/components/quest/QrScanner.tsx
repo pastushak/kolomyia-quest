@@ -44,7 +44,7 @@ export default function QrScanner({ onScan, onClose }: Props) {
   }
 
   async function detectLoop() {
-    if (!videoRef.current || !scanning) return;
+    if (!videoRef.current) return;
 
     try {
       // @ts-ignore — BarcodeDetector не в TS типах але є в Chrome
@@ -74,6 +74,10 @@ export default function QrScanner({ onScan, onClose }: Props) {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(t => t.stop());
       streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.srcObject = null;
     }
   }
 
