@@ -37,7 +37,7 @@ export async function GET() {
     // Статистика з сесій
     const sessions = await SessionModel.find({
       userId: session.user.id,
-      finishedAt: { $exists: true },
+      finishedAt: { $ne: null },
     }).lean<Array<{
       line: string;
       completedSlugs: string[];
