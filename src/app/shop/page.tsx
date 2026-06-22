@@ -83,8 +83,8 @@ export default function ShopPage() {
 
   const categories = data ? ['all', ...Array.from(new Set(data.items.map(i => i.category)))] : ['all'];
   const filtered   = data?.items.filter(i => filter === 'all' || i.category === filter) ?? [];
-  const infoItems: ShopItem[] = [];
-  const xpItems = filtered;
+  const infoItems = filtered.filter(i => i.type === 'info');
+  const xpItems   = filtered.filter(i => i.type !== 'info');
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', flexDirection: 'column', gap: 12 }}>
