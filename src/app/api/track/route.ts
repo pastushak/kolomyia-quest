@@ -42,9 +42,20 @@ export async function POST(req: NextRequest) {
     }
 
     if (event === 'session_finish') {
-      await SessionModel.findByIdAndUpdate(body.sessionId, {
-        $set: { finishedAt: new Date() },
-      });
+      // Атомарно завершуємо сесію ТІЛЬКИ якщо вона ще не завершена.
+      // Якщо finishedAt вже стоїть — updated буде null, і ми нічого не нараховуємо.
+      const updated = await SessionModel.findOneAndUpdate(
+        { _id: body.sessionId, finishedAt: null },
+        { $set: { finishedAt: new Date() } },
+        { new: true },
+      );
+
+      // Сесія вже була завершена раніше (повторний фініш / релоуд) — виходимо без нарахувань.
+      if (!updated) {
+        return NextResponse.json({ ok: true, alreadyFinished: true });
+      }
+
+      // Нараховуємо XP та пишемо у completedLines лише при ПЕРШОМУ фініші.
       if (body.userId && body.line && body.ageGroup) {
         await UserModel.findByIdAndUpdate(body.userId, {
           $inc: { totalXp: body.finalXp ?? 0 },
@@ -58,6 +69,7 @@ export async function POST(req: NextRequest) {
           },
         });
       }
+
       return NextResponse.json({ ok: true });
     }
 

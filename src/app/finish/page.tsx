@@ -24,7 +24,15 @@ export default function FinishPage() {
     const s = getSession();
     if (!s) { router.push('/'); return; }
     setSession(s);
-    finishSession();
+
+    // Guard: фінішуємо лише один раз на сесію (не повторюємо при релоуді)
+    const sid = localStorage.getItem('kq_sid');
+    const finishedKey = sid ? `kq_finished_${sid}` : null;
+    if (finishedKey && !localStorage.getItem(finishedKey)) {
+      finishSession();
+      localStorage.setItem(finishedKey, '1');
+    }
+
     fetchLine(s.line).then(data => setLineSpots(data.spots));
   }, []);
 
