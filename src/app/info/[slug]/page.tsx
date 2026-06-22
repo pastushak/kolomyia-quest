@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Image from 'next/image';
 import { trackQrScan } from '@/lib/session';
+import { lineColor, lineLabel } from '@/lib/utils';
 
 interface SpotInfo {
   slug:     string;
@@ -16,18 +17,6 @@ interface SpotInfo {
   type:     string;
   lines:    string[];
 }
-
-const LINE_COLOR: Record<string, string> = {
-  cherry: '#89182c',
-  orange: '#e28f27',
-  green:  '#8a9c39',
-};
-
-const LINE_LABEL: Record<string, string> = {
-  cherry: 'Вишнева лінія',
-  orange: 'Оранжева лінія',
-  green:  'Зелена лінія',
-};
 
 export default function InfoPage() {
   const { slug } = useParams() as { slug: string };
@@ -71,7 +60,7 @@ export default function InfoPage() {
     .split('\n')
     .filter(p => p.trim().length > 0);
 
-  const mainColor = spot.lines[0] ? LINE_COLOR[spot.lines[0]] : '#89182c';
+  const mainColor = spot.lines[0] ? lineColor(spot.lines[0], '#89182c') : '#89182c';
 
   return (
     <main style={{ minHeight: '100vh', background: '#faf8f5', paddingBottom: 60 }}>
@@ -86,7 +75,7 @@ export default function InfoPage() {
           <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
             {spot.lines.map(line => (
               <span key={line} style={{ fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 20, background: 'rgba(255,255,255,0.15)', color: '#fff', letterSpacing: 0.5 }}>
-                {LINE_LABEL[line] ?? line}
+                {lineLabel(line)}
               </span>
             ))}
             <span style={{ fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 20, background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.6)' }}>

@@ -25,6 +25,15 @@ export const LINE_EMOJI: Record<Line, string> = {
   green:  '🌿',
 };
 
+// ── Безпечні гетери для сирих рядків (line може бути string, не Line) ──
+export function lineColor(line: string, fallback = '#888'): string {
+  return LINE_COLOR[line as Line] ?? fallback;
+}
+
+export function lineLabel(line: string): string {
+  return LINE_LABEL[line as Line] ?? line;
+}
+
 // ── Fetch лінії з API ─────────────────────────────────────
 export async function fetchLine(key: Line): Promise<QuestLine & { spots: Location[] }> {
   const res = await fetch(`/api/lines/${key}`, { cache: 'no-store' });

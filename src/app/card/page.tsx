@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession, signIn } from 'next-auth/react';
 import QRCode from 'qrcode';
+import { lineColor } from '@/lib/utils';
 
 interface Redemption {
   _id:       string;
@@ -23,12 +24,6 @@ interface CardData {
   stats:          { totalSessions: number; totalLocations: number };
   redemptions:    Redemption[];
 }
-
-const LINE_COLOR: Record<string, string> = {
-  cherry: '#89182c',
-  orange: '#e28f27',
-  green:  '#8a9c39',
-};
 
 export default function TravelerCardPage() {
   const router = useRouter();
@@ -136,7 +131,7 @@ export default function TravelerCardPage() {
             <div>
               <div style={{ display: 'flex', gap: 5, marginBottom: 3 }}>
                 {['cherry', 'orange', 'green'].map(line => (
-                  <div key={line} style={{ width: 10, height: 10, borderRadius: '50%', background: LINE_COLOR[line], opacity: cardData.completedLines.some(l => l.line === line) ? 1 : 0.2 }} />
+                  <div key={line} style={{ width: 10, height: 10, borderRadius: '50%', background: lineColor(line), opacity: cardData.completedLines.some(l => l.line === line) ? 1 : 0.2 }} />
                 ))}
               </div>
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Маршрути</div>
