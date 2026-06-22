@@ -32,7 +32,6 @@ export default function SpotPage() {
     const s = getSession();
     if (!s) { router.push('/'); return; }
     setSession(s);
-    trackQrScan(slug);
 
     // Завантажуємо спот і порядок лінії паралельно
     Promise.all([
@@ -92,8 +91,12 @@ export default function SpotPage() {
       if (scannedSlug.includes('/')) {
         scannedSlug = scannedSlug.split('/').filter(Boolean).pop() ?? scannedSlug;
       }
-      if (scannedSlug === slug) setStage('quiz');
-      else router.push(`/spot/${scannedSlug}`);
+      if (scannedSlug === slug) {
+        trackQrScan(slug);   // реальний скан саме цієї точки
+        setStage('quiz');
+      } else {
+        router.push(`/spot/${scannedSlug}`);
+      }
     } catch { alert('Невірний QR-код'); }
   }
 

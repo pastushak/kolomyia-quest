@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Image from 'next/image';
+import { trackQrScan } from '@/lib/session';
 
 interface SpotInfo {
   slug:     string;
@@ -41,7 +42,11 @@ export default function InfoPage() {
         return r.json();
       })
       .then(data => {
-        if (data) { setSpot(data); setLoading(false); }
+        if (data) {
+          setSpot(data);
+          setLoading(false);
+          trackQrScan(slug);   // реальний фізичний скан QR → /info
+        }
       })
       .catch(() => { setNotFound(true); setLoading(false); });
   }, [slug]);
