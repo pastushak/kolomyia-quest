@@ -24,10 +24,18 @@ export async function POST(req: NextRequest) {
     }>();
     if (!item) return NextResponse.json({ error: 'Item not found' }, { status: 404 });
 
-    // Перевіряємо чи вже активовано
-    const existing = await RedemptionModel.findOne({ userId: session.user.id, itemId });
+    // Перевіряємо чи є ЩЕ НЕ ЗГОРІЛА активація (повторна активація дозволена після згоряння)
+    const existing = await RedemptionModel.findOne({
+      userId: session.user.id,
+      itemId,
+      expiresAt: { $gt: new Date() },
+    });
     if (existing) {
-      return NextResponse.json({ error: 'Already redeemed', code: existing.code }, { status: 409 });
+      return NextResponse.json({
+        error: 'Already redeemed',
+        code: existing.code,
+        expiresAt: existing.expiresAt,
+      }, { status: 409 });
     }
 
     // Перевіряємо баланс XP
@@ -40,6 +48,10 @@ export async function POST(req: NextRequest) {
     // Генеруємо унікальний код купону
     const code = `KQ-${randomBytes(3).toString('hex').toUpperCase()}-${randomBytes(3).toString('hex').toUpperCase()}`;
 
+    // Вікно дії активації: інфокартки — 48 год, знижки/безкоштовне — 24 год
+    const ACTIVE_HOURS = item.type === 'info' ? 48 : 24;
+    const expiresAt = new Date(Date.now() + ACTIVE_HOURS * 60 * 60 * 1000);
+
     // Списуємо XP і створюємо купон
     await UserModel.findByIdAndUpdate(session.user.id, { $inc: { totalXp: -item.xpCost } });
     const redemption = await RedemptionModel.create({
@@ -47,9 +59,15 @@ export async function POST(req: NextRequest) {
       itemId,
       code,
       xpSpent:  item.xpCost,
+      expiresAt,
     });
 
-    return NextResponse.json({ ok: true, code: redemption.code, itemName: item.name });
+    return NextResponse.json({
+      ok: true,
+      code: redemption.code,
+      itemName: item.name,
+      expiresAt: redemption.expiresAt,
+    });
   } catch (err) {
     console.error('POST /api/shop/redeem:', err);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });

@@ -21,10 +21,10 @@ interface ShopItem {
 }
 
 interface ShopData {
-  items:           ShopItem[];
-  userXp:          number;
-  redeemedItemIds: string[];
-  isLoggedIn:      boolean;
+  items:             ShopItem[];
+  userXp:            number;
+  activeRedemptions: { itemId: string; expiresAt: string }[];
+  isLoggedIn:        boolean;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -41,6 +41,22 @@ const TYPE_LABELS: Record<string, string> = {
   discount: 'Знижка',
   freebie:  'Безкоштовно',
 };
+
+function getActiveRedemption(
+  itemId: string,
+  active: { itemId: string; expiresAt: string }[] | undefined,
+): { expiresAt: string } | null {
+  return active?.find(r => r.itemId === itemId) ?? null;
+}
+
+function formatRemaining(expiresAt: string): string {
+  const ms = new Date(expiresAt).getTime() - Date.now();
+  if (ms <= 0) return 'Термін вийшов';
+  const hours = Math.floor(ms / (1000 * 60 * 60));
+  if (hours >= 1) return `ще ${hours} год`;
+  const mins = Math.max(1, Math.floor(ms / (1000 * 60)));
+  return `ще ${mins} хв`;
+}
 
 export default function ShopPage() {
   const router = useRouter();
@@ -75,8 +91,12 @@ export default function ShopPage() {
     const json = await res.json();
     setActivating(null);
 
-    if (res.ok || res.status === 409) {
+    if (res.ok) {
+      // Нова активація — показуємо купон
       setModal({ code: json.code, itemName: item.name });
+      await loadShop();
+    } else if (res.status === 409) {
+      // Картка вже активна — просто оновлюємо стан (картка покаже відлік)
       await loadShop();
     }
   }
@@ -165,7 +185,7 @@ export default function ShopPage() {
           <>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', color: '#89182c', marginBottom: 12 }}>Корисні місця</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
-              {infoItems.map(item => <ShopCard key={item._id} item={item} userXp={data?.userXp ?? 0} redeemed={data?.redeemedItemIds.includes(item._id) ?? false} isLoggedIn={data?.isLoggedIn ?? false} activating={activating === item._id} onRedeem={() => handleRedeem(item)} />)}
+              {infoItems.map(item => <ShopCard key={item._id} item={item} userXp={data?.userXp ?? 0} redemption={getActiveRedemption(item._id, data?.activeRedemptions)} isLoggedIn={data?.isLoggedIn ?? false} activating={activating === item._id} onRedeem={() => handleRedeem(item)} />)}
             </div>
           </>
         )}
@@ -175,7 +195,7 @@ export default function ShopPage() {
           <>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', color: '#89182c', marginBottom: 12 }}>Знижки за XP</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {xpItems.map(item => <ShopCard key={item._id} item={item} userXp={data?.userXp ?? 0} redeemed={data?.redeemedItemIds.includes(item._id) ?? false} isLoggedIn={data?.isLoggedIn ?? false} activating={activating === item._id} onRedeem={() => handleRedeem(item)} />)}
+              {xpItems.map(item => <ShopCard key={item._id} item={item} userXp={data?.userXp ?? 0} redemption={getActiveRedemption(item._id, data?.activeRedemptions)} isLoggedIn={data?.isLoggedIn ?? false} activating={activating === item._id} onRedeem={() => handleRedeem(item)} />)}
             </div>
           </>
         )}
@@ -205,13 +225,14 @@ export default function ShopPage() {
   );
 }
 
-function ShopCard({ item, userXp, redeemed, isLoggedIn, activating, onRedeem }: {
-  item: ShopItem; userXp: number; redeemed: boolean; isLoggedIn: boolean; activating: boolean; onRedeem: () => void;
+function ShopCard({ item, userXp, redemption, isLoggedIn, activating, onRedeem }: {
+  item: ShopItem; userXp: number; redemption: { expiresAt: string } | null; isLoggedIn: boolean; activating: boolean; onRedeem: () => void;
 }) {
   const canAfford = userXp >= item.xpCost;
+  const isActive  = !!redemption;
 
   return (
-    <div style={{ background: '#fff', borderRadius: 18, padding: 16, boxShadow: '0 2px 12px rgba(0,0,0,0.05)', opacity: redeemed ? 0.75 : 1 }}>
+    <div style={{ background: '#fff', borderRadius: 18, padding: 16, boxShadow: '0 2px 12px rgba(0,0,0,0.05)', opacity: isActive ? 0.75 : 1 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 10 }}>
         <div style={{ width: 48, height: 48, borderRadius: 14, background: '#faf8f5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>
           {item.emoji}
@@ -234,8 +255,10 @@ function ShopCard({ item, userXp, redeemed, isLoggedIn, activating, onRedeem }: 
           {item.type === 'info' ? `Інфо · ${item.xpCost} XP` : `${item.discountText} · ${item.xpCost} XP`}
         </span>
 
-        {redeemed ? (
-          <span style={{ fontSize: 12, fontWeight: 700, padding: '6px 14px', borderRadius: 12, background: '#E8F5EE', color: '#2D7A4F' }}>✓ Активовано</span>
+        {isActive ? (
+          <span style={{ fontSize: 12, fontWeight: 700, padding: '6px 14px', borderRadius: 12, background: '#E8F5EE', color: '#2D7A4F' }}>
+            ✓ Активовано · {formatRemaining(redemption!.expiresAt)}
+          </span>
         ) : !isLoggedIn ? (
           <button onClick={onRedeem} style={{ padding: '7px 14px', borderRadius: 12, border: 'none', background: '#89182c', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
             Увійти

@@ -5,6 +5,7 @@ const RedemptionSchema = new Schema({
   itemId:    { type: Types.ObjectId, ref: 'ShopItem', required: true },
   code:      { type: String, required: true, unique: true },  // унікальний код купону
   xpSpent:   { type: Number, required: true },
+  expiresAt: { type: Date, required: true },  // термін дії активації (48 год інфо / 24 год знижки)
   isUsed:    { type: Boolean, default: false },
   usedAt:    { type: Date, default: null },
   createdAt: { type: Date, default: Date.now },

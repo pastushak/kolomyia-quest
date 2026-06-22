@@ -18,23 +18,27 @@ export async function GET() {
 
     // Якщо авторизований — додаємо інфо про активовані купони і баланс XP
     let userXp = 0;
-    let redeemedItemIds: string[] = [];
+    let activeRedemptions: { itemId: string; expiresAt: Date }[] = [];
 
     if (session?.user?.id) {
       const user = await UserModel.findById(session.user.id).select('totalXp').lean<{ totalXp: number }>();
       userXp = user?.totalXp ?? 0;
 
+      // Тільки ще не згорілі активації (термін дії не вийшов)
       const redemptions = await RedemptionModel
-        .find({ userId: session.user.id })
-        .select('itemId')
-        .lean<{ itemId: any }[]>();
-      redeemedItemIds = redemptions.map(r => r.itemId.toString());
+        .find({ userId: session.user.id, expiresAt: { $gt: new Date() } })
+        .select('itemId expiresAt')
+        .lean<{ itemId: any; expiresAt: Date }[]>();
+      activeRedemptions = redemptions.map(r => ({
+        itemId:    r.itemId.toString(),
+        expiresAt: r.expiresAt,
+      }));
     }
 
     return NextResponse.json({
       items,
       userXp,
-      redeemedItemIds,
+      activeRedemptions,
       isLoggedIn: !!session?.user?.id,
     });
   } catch (err) {
