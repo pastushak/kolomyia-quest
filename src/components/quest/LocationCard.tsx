@@ -28,15 +28,9 @@ export default function LocationCard({ name, address, info, audioUrl, qrHint, sp
     if (!audioUrl || !audioRef.current) return;
     const audio = audioRef.current;
 
-    let autoplayTimer: ReturnType<typeof setTimeout> | undefined;
-
     const handleLoadedMetadata = () => {
       setDuration(audio.duration);
       setLoaded(true);
-      // Автозапуск з невеликою затримкою
-      autoplayTimer = setTimeout(() => {
-        audio.play().then(() => setPlaying(true)).catch(() => {});
-      }, 800);
     };
 
     const handleTimeUpdate = () => {
@@ -54,7 +48,6 @@ export default function LocationCard({ name, address, info, audioUrl, qrHint, sp
 
     // Cleanup: знімаємо слухачі й таймер при зміні audioUrl / розмонтуванні
     return () => {
-      if (autoplayTimer) clearTimeout(autoplayTimer);
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('ended', handleEnded);
