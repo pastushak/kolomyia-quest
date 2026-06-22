@@ -23,27 +23,43 @@ export default function LocationCard({ name, address, info, audioUrl, qrHint, sp
   const [loaded, setLoaded]     = useState(false);
 
   // Автозапуск при відкритті
+  // Автозапуск при відкритті
   useEffect(() => {
     if (!audioUrl || !audioRef.current) return;
     const audio = audioRef.current;
 
-    audio.addEventListener('loadedmetadata', () => {
+    let autoplayTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const handleLoadedMetadata = () => {
       setDuration(audio.duration);
       setLoaded(true);
       // Автозапуск з невеликою затримкою
-      setTimeout(() => {
+      autoplayTimer = setTimeout(() => {
         audio.play().then(() => setPlaying(true)).catch(() => {});
       }, 800);
-    });
+    };
 
-    audio.addEventListener('timeupdate', () => {
+    const handleTimeUpdate = () => {
       setProgress(audio.currentTime / audio.duration * 100);
-    });
+    };
 
-    audio.addEventListener('ended', () => {
+    const handleEnded = () => {
       setPlaying(false);
       setProgress(0);
-    });
+    };
+
+    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audio.addEventListener('timeupdate', handleTimeUpdate);
+    audio.addEventListener('ended', handleEnded);
+
+    // Cleanup: знімаємо слухачі й таймер при зміні audioUrl / розмонтуванні
+    return () => {
+      if (autoplayTimer) clearTimeout(autoplayTimer);
+      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
+      audio.removeEventListener('ended', handleEnded);
+      audio.pause();
+    };
   }, [audioUrl]);
 
   function togglePlay() {
