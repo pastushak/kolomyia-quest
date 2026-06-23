@@ -33,6 +33,19 @@ const SessionSchema = new Schema(
     completedCount: { type: Number, default: 0 },
     completedSlugs: { type: [String], default: [] },
     deviceLang:     { type: String, default: '' },
+
+    // Пересадки: історія гілок проходження. Активна гілка = остання.
+    branches: {
+      type: [
+        {
+          line:           { type: String, enum: ['cherry', 'orange', 'green'] },
+          completedSlugs: { type: [String], default: [] },
+          enteredAt:      { type: Date, default: Date.now },
+        },
+      ],
+      default: [],
+    },
+    transferCount: { type: Number, default: 0 },
   },
   { timestamps: true },
 );
