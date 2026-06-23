@@ -74,7 +74,6 @@ export default function SpotPage() {
   const spotIndex   = order.indexOf(slug);
   const spotNumber  = spotIndex + 1;
   const quiz        = getQuizForLine(spot, line);
-  const xpReward    = 100;
   const hudzykMood  = stage === 'quiz' ? 'curious' : 'guide';
   const hudzykMsg   = stage === 'quiz' ? 'Відповідай!' : `Точка ${spotNumber}!`;
 
@@ -100,8 +99,8 @@ export default function SpotPage() {
     } catch { alert('Невірний QR-код'); }
   }
 
-  async function handleQuizComplete() {
-    await completeSpot(slug, xpReward);
+  async function handleQuizComplete(xpEarned: number) {
+    await completeSpot(slug, xpEarned);
     const s = getSession();
     if (s) setSession(s);
     const next = getNextSlug(order, slug);
@@ -160,11 +159,12 @@ export default function SpotPage() {
               questions={[{
                 question:     quiz.question,
                 options:      quiz.options,
-                correctIndex: quiz.correctIndex,
-                explanation:  quiz.explanation,
+                correctIndex: -1,        // не використовується (перевірка на сервері)
+                explanation:  quiz.explanation ?? '',
               }]}
+              slug={slug}
+              line={line}
               lineColor={color}
-              xpReward={xpReward}
               onComplete={handleQuizComplete}
             />
           ) : (
@@ -176,7 +176,7 @@ export default function SpotPage() {
                 Команда вже готує цікаві питання<br />про це місце. Заходь пізніше!
               </div>
               <button
-                onClick={handleQuizComplete}
+                onClick={() => handleQuizComplete(0)}
                 style={{ width: '100%', padding: 16, borderRadius: 16, border: 'none', background: color, color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer' }}
               >
                 Продовжити без квізу →
