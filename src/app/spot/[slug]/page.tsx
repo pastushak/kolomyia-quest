@@ -199,12 +199,8 @@ export default function SpotPage() {
                     key={t}
                     onClick={() => {
                       if (confirm(`Пересісти на ${LINE_LABEL[t]}? Твій поточний прогрес збережеться.`)) {
-                        fetch(`/api/lines/${t}`)
-                          .then(r => r.json())
-                          .then(data => {
-                            switchLine(t as any, slug, data.order);
-                            router.push(`/start/${t}`);
-                          });
+                        switchLine(t as any);
+                        router.push(`/start/${t}`);
                       }
                     }}
                     style={{

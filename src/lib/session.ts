@@ -144,23 +144,44 @@ export async function trackQrScan(slug: string): Promise<void> {
   });
 }
 
-export function switchLine(newLine: Line, fromSlug?: string, newLineOrder?: string[]): void {
+// ── Пересадка на іншу лінію ───────────────────────────────
+// За специфікацією: точки нової лінії до стику НЕ даруються — вони пропущені.
+// Ведемо історію гілок (branches). XP за перехід (-50) списується окремо, серверно (Крок 4).
+export function switchLine(newLine: Line): void {
   const session = getSession();
   if (!session) return;
-  session.line = newLine;
 
-  // Додаємо всі точки нової лінії до точки пересадки включно
-  if (fromSlug && newLineOrder) {
-    const transferIndex = newLineOrder.indexOf(fromSlug);
-    if (transferIndex !== -1) {
-      const slugsToComplete = newLineOrder.slice(0, transferIndex + 1);
-      slugsToComplete.forEach(slug => {
-        if (!session.completedSlugs.includes(slug)) {
-          session.completedSlugs.push(slug);
-        }
-      });
-    }
+  // Ініціалізуємо гілки, якщо їх ще нема (стара сесія або перший перехід).
+  // Перша гілка = поточна лінія з уже реально пройденими точками цієї лінії.
+  if (!session.branches || session.branches.length === 0) {
+    session.branches = [
+      {
+        line:           session.line,
+        completedSlugs: [...session.completedSlugs],
+        enteredAt:      session.startedAt ?? new Date().toISOString(),
+      },
+    ];
+  } else {
+    // Закриваємо поточну (останню) гілку — синхронізуємо її пройдені точки
+    // з тими, що накопичились у session.completedSlugs на цій лінії.
+    const lastBranch = session.branches[session.branches.length - 1];
+    lastBranch.completedSlugs = session.completedSlugs.filter(
+      slug => !session.branches!
+        .slice(0, -1)
+        .some(b => b.completedSlugs.includes(slug)),
+    );
   }
+
+  // Відкриваємо нову гілку — НІЧОГО не даруємо.
+  session.branches.push({
+    line:           newLine,
+    completedSlugs: [],
+    enteredAt:      new Date().toISOString(),
+  });
+
+  // Оновлюємо активну лінію й лічильник переходів.
+  session.line          = newLine;
+  session.transferCount = (session.transferCount ?? 0) + 1;
 
   localStorage.setItem(KEY, JSON.stringify(session));
 }
