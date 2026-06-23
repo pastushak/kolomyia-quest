@@ -23,6 +23,8 @@ export async function POST(req: NextRequest) {
     }
 
     if (event === 'spot_complete') {
+      // Аналітика відвідувань. XP та completedSlugs тепер веде /api/quiz/answer (серверно),
+      // тому тут їх БІЛЬШЕ НЕ пишемо — інакше клієнтська сума затирала б серверний баланс.
       await SpotVisitModel.create({
         sessionId:    body.sessionId,
         slug:         body.slug,
@@ -30,13 +32,9 @@ export async function POST(req: NextRequest) {
         quizAttempts: body.attempts ?? 1,
         xpEarned:     body.xpEarned ?? 0,
       });
+      // Оновлюємо лише лічильник пройдених (необов'язкове, для зручності статистики).
       await SessionModel.findByIdAndUpdate(body.sessionId, {
-        $set: {
-          xpTotal:        body.xpTotal,
-          bonusXp:        body.bonusXp ?? 0,
-          completedCount: body.completedCount,
-        },
-        $push: { completedSlugs: body.slug },
+        $set: { completedCount: body.completedCount },
       });
       return NextResponse.json({ ok: true });
     }
@@ -56,21 +54,65 @@ export async function POST(req: NextRequest) {
       }
 
       // Нараховуємо XP та пишемо у completedLines лише при ПЕРШОМУ фініші.
-      if (body.userId && body.line && body.ageGroup) {
+      // Бонус за фініш визначає СЕРВЕР: чиста лінія +300, модифікація +100.
+      if (body.userId && body.ageGroup) {
+        const isModification = (body.transferCount ?? 0) > 0;
+        const finishBonus    = isModification ? 100 : 300;
+        const totalAward      = (body.finalXp ?? 0) + finishBonus;
+
+        const completedLineEntry = isModification
+          ? {
+              type:         'modification',
+              line:         null,
+              modification: body.modification ?? '',   // нотація "cherry(3)-orange(4)"
+              branches:     body.branches ?? [],         // [{ line, count }]
+              ageGroup:     body.ageGroup,
+              completedAt:  new Date(),
+              finalXp:      totalAward,
+            }
+          : {
+              type:         'pure',
+              line:         body.line ?? null,
+              modification: null,
+              branches:     [],
+              ageGroup:     body.ageGroup,
+              completedAt:  new Date(),
+              finalXp:      totalAward,
+            };
+
         await UserModel.findByIdAndUpdate(body.userId, {
-          $inc: { totalXp: body.finalXp ?? 0 },
-          $push: {
-            completedLines: {
-              line:        body.line,
-              ageGroup:    body.ageGroup,
-              completedAt: new Date(),
-              finalXp:     body.finalXp ?? 0,
-            },
-          },
+          $inc:  { totalXp: totalAward },
+          $push: { completedLines: completedLineEntry },
         });
       }
 
       return NextResponse.json({ ok: true });
+    }
+
+    if (event === 'transfer') {
+      // Пересадка коштує 50 XP. Платиться з СЕСІЙНОГО балансу (SessionModel.xpTotal),
+      // який ведеться серверно через /api/quiz/answer. Лише для залогінених.
+      if (!body.userId) {
+        return NextResponse.json({ ok: false, reason: 'auth_required' });
+      }
+      if (!body.sessionId) {
+        return NextResponse.json({ ok: false, reason: 'error' });
+      }
+
+      const TRANSFER_COST = 50;
+
+      // Атомарно списуємо 50 XP з сесії ТІЛЬКИ якщо балансу вистачає (xpTotal >= 50).
+      const updated = await SessionModel.findOneAndUpdate(
+        { _id: body.sessionId, xpTotal: { $gte: TRANSFER_COST } },
+        { $inc: { xpTotal: -TRANSFER_COST, transferCount: 1 } },
+        { new: true },
+      );
+
+      if (!updated) {
+        return NextResponse.json({ ok: false, reason: 'insufficient_xp' });
+      }
+
+      return NextResponse.json({ ok: true, newBalance: updated.xpTotal });
     }
 
     if (event === 'qr_scan') {

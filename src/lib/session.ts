@@ -3,8 +3,6 @@ import { Session, Line, AgeGroup } from '@/types';
 const KEY     = 'kq_session';
 const SID_KEY = 'kq_sid';
 
-const LOGIN_BONUS_MULTIPLIER = 1.2;
-
 // ── Читання / запис ───────────────────────────────────────
 export function getSession(): Session | null {
   if (typeof window === 'undefined') return null;
@@ -74,34 +72,26 @@ export async function createSession(
   return session;
 }
 
-// ── XP з бонусом ─────────────────────────────────────────
-export function calculateXp(
-  baseXp:    number,
-  isLoggedIn: boolean,
-): { xpEarned: number; bonusEarned: number } {
-  if (!isLoggedIn) return { xpEarned: baseXp, bonusEarned: 0 };
-  const total = Math.round(baseXp * LOGIN_BONUS_MULTIPLIER);
-  return { xpEarned: baseXp, bonusEarned: total - baseXp };
-}
-
 // ── Завершення споту ──────────────────────────────────────
+// XP веде СЕРВЕР (/api/quiz/answer). Сюди приходить актуальний серверний
+// баланс сесії (sessionXp) — ми лише синхронізуємо локальний стан для відображення.
 export async function completeSpot(
-  slug:     string,
-  xpEarned: number,
-  attempts  = 1,
+  slug:        string,
+  serverXp:    number,   // повний серверний баланс сесії (не приріст!)
+  attempts  =  1,
 ): Promise<Session | null> {
   const session = getSession();
   if (!session) return null;
 
+  // Синхронізуємо локальні поля з сервером (для UI). Точку позначаємо пройденою.
   if (!session.completedSlugs.includes(slug)) {
     session.completedSlugs.push(slug);
-    const isLoggedIn = !!session.userId;
-    const { xpEarned: baseXp, bonusEarned } = calculateXp(xpEarned, isLoggedIn);
-    session.xp      += baseXp;
-    session.bonusXp += bonusEarned;
   }
+  session.xp      = serverXp;   // ← серверний баланс, не додавання
+  session.bonusXp = 0;          // бонус-логіка прибрана (рудимент)
   localStorage.setItem(KEY, JSON.stringify(session));
 
+  // Аналітика відвідування (XP сервер уже нарахував у квіз-ендпоінті).
   const sid = getDbSessionId();
   if (sid) {
     await track({
@@ -110,9 +100,7 @@ export async function completeSpot(
       slug,
       line:           session.line,
       attempts,
-      xpEarned,
-      xpTotal:        session.xp + session.bonusXp,
-      bonusXp:        session.bonusXp,
+      xpEarned:       0,                      // не використовується для нарахування
       completedCount: session.completedSlugs.length,
     });
   }
@@ -123,16 +111,33 @@ export async function completeSpot(
 export async function finishSession(): Promise<void> {
   const sid     = getDbSessionId();
   const session = getSession();
-  if (sid) {
-    await track({
-      event:     'session_finish',
-      sessionId: sid,
-      userId:    session?.userId ?? null,
-      line:      session?.line,
-      ageGroup:  session?.ageGroup,
-      finalXp:   (session?.xp ?? 0) + (session?.bonusXp ?? 0),
-    });
+  if (!sid || !session) return;
+
+  const transferCount = session.transferCount ?? 0;
+  const isModification = transferCount > 0;
+
+  // Нотація модифікації "cherry(3)-green(4)" + структура гілок для статистики.
+  let modification = '';
+  let branchStats: Array<{ line: Line; count: number }> = [];
+  if (isModification && session.branches?.length) {
+    branchStats = session.branches.map(b => ({
+      line:  b.line,
+      count: b.completedSlugs.length,
+    }));
+    modification = branchStats.map(b => `${b.line}(${b.count})`).join('-');
   }
+
+  await track({
+    event:         'session_finish',
+    sessionId:     sid,
+    userId:        session.userId ?? null,
+    line:          session.line,
+    ageGroup:      session.ageGroup,
+    finalXp:       session.xp ?? 0,        // серверний баланс сесії
+    transferCount,
+    modification,                           // "" якщо чиста лінія
+    branches:      branchStats,             // [] якщо чиста лінія
+  });
 }
 
 // ── QR скан ───────────────────────────────────────────────
@@ -146,13 +151,50 @@ export async function trackQrScan(slug: string): Promise<void> {
 
 // ── Пересадка на іншу лінію ───────────────────────────────
 // За специфікацією: точки нової лінії до стику НЕ даруються — вони пропущені.
-// Ведемо історію гілок (branches). XP за перехід (-50) списується окремо, серверно (Крок 4).
-export function switchLine(newLine: Line): void {
-  const session = getSession();
-  if (!session) return;
+// Перехід коштує 50 XP (серверно, лише для залогінених). Ведемо історію гілок.
+//
+// Повертає результат, щоб UI міг показати причину відмови:
+//   { ok: true }                          — перехід відбувся
+//   { ok: false, reason: 'auth_required' }  — потрібен вхід
+//   { ok: false, reason: 'insufficient_xp' } — мало XP
+//   { ok: false, reason: 'error' }          — мережа/сервер
+export type SwitchResult =
+  | { ok: true; newBalance?: number }
+  | { ok: false; reason: 'auth_required' | 'insufficient_xp' | 'error' };
 
-  // Ініціалізуємо гілки, якщо їх ще нема (стара сесія або перший перехід).
-  // Перша гілка = поточна лінія з уже реально пройденими точками цієї лінії.
+export async function switchLine(newLine: Line): Promise<SwitchResult> {
+  const session = getSession();
+  if (!session) return { ok: false, reason: 'error' };
+
+  const sid = getDbSessionId();
+
+  // 1. Спершу серверно списуємо 50 XP за перехід (перевірка балансу на сервері).
+  try {
+    const res = await fetch('/api/track', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        event:     'transfer',
+        sessionId: sid,
+        userId:    session.userId ?? null,
+      }),
+    });
+    const data = await res.json();
+
+    if (!data.ok) {
+      // Перехід НЕ відбувся — повертаємо причину, нічого локально не міняємо.
+      return { ok: false, reason: data.reason ?? 'error' };
+    }
+
+    // Перехід успішний — синхронізуємо локальний баланс із серверним (після списання -50).
+    if (typeof data.newBalance === 'number') {
+      session.xp = data.newBalance;
+    }
+  } catch {
+    return { ok: false, reason: 'error' };
+  }
+
+  // 2. Сервер підтвердив і списав XP — застосовуємо гілки локально.
   if (!session.branches || session.branches.length === 0) {
     session.branches = [
       {
@@ -162,8 +204,6 @@ export function switchLine(newLine: Line): void {
       },
     ];
   } else {
-    // Закриваємо поточну (останню) гілку — синхронізуємо її пройдені точки
-    // з тими, що накопичились у session.completedSlugs на цій лінії.
     const lastBranch = session.branches[session.branches.length - 1];
     lastBranch.completedSlugs = session.completedSlugs.filter(
       slug => !session.branches!
@@ -172,16 +212,16 @@ export function switchLine(newLine: Line): void {
     );
   }
 
-  // Відкриваємо нову гілку — НІЧОГО не даруємо.
   session.branches.push({
     line:           newLine,
     completedSlugs: [],
     enteredAt:      new Date().toISOString(),
   });
 
-  // Оновлюємо активну лінію й лічильник переходів.
   session.line          = newLine;
   session.transferCount = (session.transferCount ?? 0) + 1;
 
   localStorage.setItem(KEY, JSON.stringify(session));
+
+  return { ok: true };
 }

@@ -197,10 +197,23 @@ export default function SpotPage() {
                 .map(t => (
                   <button
                     key={t}
-                    onClick={() => {
-                      if (confirm(`Пересісти на ${LINE_LABEL[t]}? Твій поточний прогрес збережеться.`)) {
-                        switchLine(t as any);
+                    onClick={async () => {
+                      if (!session?.userId) {
+                        alert('Щоб пересідати між лініями, потрібно увійти через Google.');
+                        return;
+                      }
+                      if (!confirm(`Пересісти на ${LINE_LABEL[t]}? Перехід коштує 50 XP. Точки до місця пересадки лишаться непройденими.`)) {
+                        return;
+                      }
+                      const result = await switchLine(t as any);
+                      if (result.ok) {
                         router.push(`/start/${t}`);
+                      } else if (result.reason === 'insufficient_xp') {
+                        alert('Недостатньо XP для пересадки (потрібно 50).');
+                      } else if (result.reason === 'auth_required') {
+                        alert('Щоб пересідати, потрібно увійти через Google.');
+                      } else {
+                        alert('Не вдалося виконати пересадку. Спробуй ще раз.');
                       }
                     }}
                     style={{
