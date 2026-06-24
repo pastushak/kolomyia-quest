@@ -26,6 +26,8 @@ export default function SpotPage() {
   const [loading, setLoading]     = useState(true);
   const [showScanner, setShowScanner] = useState(false);
   const [mounted, setMounted]     = useState(false);
+  const [quizDone, setQuizDone]   = useState(false);   // квіз пройдено — показуємо вибір далі/пересадка
+  const [switching, setSwitching] = useState(false);   // йде процес пересадки
 
   useEffect(() => {
     setMounted(true);
@@ -99,13 +101,62 @@ export default function SpotPage() {
     } catch { alert('Невірний QR-код'); }
   }
 
-  async function handleQuizComplete(xpEarned: number) {
-    await completeSpot(slug, xpEarned);
+  async function handleQuizComplete(serverXp: number) {
+    await completeSpot(slug, serverXp);
     const s = getSession();
     if (s) setSession(s);
+
+    // Чи є куди пересідати з цієї точки (окрім поточної лінії)?
+    const canTransfer = (spot?.transfers ?? []).some(t => t !== line);
+
+    if (canTransfer) {
+      // Спільна точка — НЕ йдемо одразу далі. Показуємо екран вибору: далі цією лінією чи пересадка.
+      setQuizDone(true);
+    } else {
+      // Звичайна точка — одразу далі.
+      goNextSameLine();
+    }
+  }
+
+  // Продовжити поточною лінією (звичайний перехід до наступної точки).
+  function goNextSameLine() {
     const next = getNextSlug(order, slug);
     if (next) router.push(`/spot/${next}`);
     else router.push('/finish');
+  }
+
+  // Пересадка на іншу лінію зі спільної точки.
+  async function handleTransfer(toLine: string) {
+    if (!session?.userId) {
+      alert('Щоб пересідати між лініями, потрібно увійти через Google.');
+      return;
+    }
+    if (!confirm(`Пересісти на ${LINE_LABEL[toLine]}? Перехід коштує 50 XP. Точки до місця пересадки на старій лінії лишаться непройденими.`)) {
+      return;
+    }
+
+    setSwitching(true);
+    // switchLine: списує -50 серверно, оновлює гілки, зараховує спільну точку обом гілкам.
+    const result = await switchLine(toLine as any, slug);
+    setSwitching(false);
+
+    if (!result.ok) {
+      if (result.reason === 'insufficient_xp') alert('Недостатньо XP для пересадки (потрібно 50).');
+      else if (result.reason === 'auth_required') alert('Щоб пересідати, потрібно увійти через Google.');
+      else alert('Не вдалося виконати пересадку. Спробуй ще раз.');
+      return;
+    }
+
+    // Успіх — визначаємо наступну точку НОВОЇ лінії (після спільної точки в її order).
+    try {
+      const lineData = await fetch(`/api/lines/${toLine}`).then(r => r.json());
+      const next = getNextSlug(lineData.order, slug);
+      if (next) router.push(`/spot/${next}`);
+      else router.push('/finish');
+    } catch {
+      alert('Пересадка виконана, але не вдалося завантажити нову лінію. Повтори з мапи.');
+      router.push(`/start/${toLine}`);
+    }
   }
 
   return (
@@ -185,11 +236,32 @@ export default function SpotPage() {
           )
         )}
 
-        {/* Пересадки */}
-        {spot.transfers.length > 0 && (
+        {/* Екран вибору після квіза на спільній точці: далі цією лінією або пересадка */}
+        {quizDone && (
           <div style={{ marginTop: 16, background: '#fff', border: '1px solid #EEEEF5', borderRadius: 20, padding: '18px 16px' }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#8B6914', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-              🚇 Пересадка доступна з цієї точки
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#1A1A2E', marginBottom: 4 }}>
+              Квіз пройдено! 🎉
+            </div>
+            <div style={{ fontSize: 13, color: '#8888A8', marginBottom: 16, lineHeight: 1.5 }}>
+              Ти на перехресті ліній. Можеш продовжити цією лінією або пересісти на іншу.
+            </div>
+
+            {/* Продовжити поточною лінією */}
+            <button
+              onClick={goNextSameLine}
+              disabled={switching}
+              style={{
+                width: '100%', padding: 14, borderRadius: 14, border: 'none',
+                background: color, color: '#fff', fontSize: 15, fontWeight: 700,
+                cursor: switching ? 'default' : 'pointer', marginBottom: 12, opacity: switching ? 0.6 : 1,
+              }}
+            >
+              Продовжити {LINE_LABEL[line]} →
+            </button>
+
+            {/* Пересадки на інші лінії */}
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#8B6914', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+              🚇 Пересадка (−50 XP)
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {spot.transfers
@@ -197,29 +269,13 @@ export default function SpotPage() {
                 .map(t => (
                   <button
                     key={t}
-                    onClick={async () => {
-                      if (!session?.userId) {
-                        alert('Щоб пересідати між лініями, потрібно увійти через Google.');
-                        return;
-                      }
-                      if (!confirm(`Пересісти на ${LINE_LABEL[t]}? Перехід коштує 50 XP. Точки до місця пересадки лишаться непройденими.`)) {
-                        return;
-                      }
-                      const result = await switchLine(t as any);
-                      if (result.ok) {
-                        router.push(`/start/${t}`);
-                      } else if (result.reason === 'insufficient_xp') {
-                        alert('Недостатньо XP для пересадки (потрібно 50).');
-                      } else if (result.reason === 'auth_required') {
-                        alert('Щоб пересідати, потрібно увійти через Google.');
-                      } else {
-                        alert('Не вдалося виконати пересадку. Спробуй ще раз.');
-                      }
-                    }}
+                    onClick={() => handleTransfer(t)}
+                    disabled={switching}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 12,
                       padding: '12px 14px', borderRadius: 14, border: `2px solid ${LINE_COLOR[t]}20`,
-                      background: LINE_COLOR[t] + '10', cursor: 'pointer', textAlign: 'left',
+                      background: LINE_COLOR[t] + '10', cursor: switching ? 'default' : 'pointer',
+                      textAlign: 'left', opacity: switching ? 0.6 : 1,
                     }}
                   >
                     <div style={{ width: 12, height: 12, borderRadius: '50%', background: LINE_COLOR[t], flexShrink: 0 }} />
@@ -228,10 +284,10 @@ export default function SpotPage() {
                         {LINE_LABEL[t]}
                       </div>
                       <div style={{ fontSize: 11, color: '#8888A8' }}>
-                        Натисни щоб пересісти на цю лінію
+                        Звернути на цю лінію
                       </div>
                     </div>
-                    <span style={{ fontSize: 18 }}>→</span>
+                    <span style={{ fontSize: 18 }}>{switching ? '…' : '→'}</span>
                   </button>
                 ))}
             </div>

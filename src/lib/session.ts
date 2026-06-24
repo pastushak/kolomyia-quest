@@ -162,13 +162,13 @@ export type SwitchResult =
   | { ok: true; newBalance?: number }
   | { ok: false; reason: 'auth_required' | 'insufficient_xp' | 'error' };
 
-export async function switchLine(newLine: Line): Promise<SwitchResult> {
+export async function switchLine(newLine: Line, sharedSlug: string): Promise<SwitchResult> {
   const session = getSession();
   if (!session) return { ok: false, reason: 'error' };
 
   const sid = getDbSessionId();
 
-  // 1. Спершу серверно списуємо 50 XP за перехід (перевірка балансу на сервері).
+  // 1. Серверно списуємо 50 XP за перехід (перевірка балансу сесії на сервері).
   try {
     const res = await fetch('/api/track', {
       method:  'POST',
@@ -182,11 +182,10 @@ export async function switchLine(newLine: Line): Promise<SwitchResult> {
     const data = await res.json();
 
     if (!data.ok) {
-      // Перехід НЕ відбувся — повертаємо причину, нічого локально не міняємо.
       return { ok: false, reason: data.reason ?? 'error' };
     }
 
-    // Перехід успішний — синхронізуємо локальний баланс із серверним (після списання -50).
+    // Синхронізуємо локальний баланс із серверним (після -50).
     if (typeof data.newBalance === 'number') {
       session.xp = data.newBalance;
     }
@@ -194,8 +193,19 @@ export async function switchLine(newLine: Line): Promise<SwitchResult> {
     return { ok: false, reason: 'error' };
   }
 
-  // 2. Сервер підтвердив і списав XP — застосовуємо гілки локально.
+  // 2. Оновлюємо гілки.
+  // Спільна точка (sharedSlug) — це станція пересадки. Квіз на ній уже пройдено,
+  // тож вона має лишитись у completedSlugs (зарахована СТАРІЙ гілці) і одразу
+  // потрапити в НОВУ гілку (зарахована обом гілкам, за моделлю).
+
+  // Гарантуємо, що спільна точка є в загальному completedSlugs (квіз пройдено).
+  if (!session.completedSlugs.includes(sharedSlug)) {
+    session.completedSlugs.push(sharedSlug);
+  }
+
+  // Ініціалізуємо/закриваємо поточну гілку.
   if (!session.branches || session.branches.length === 0) {
+    // Перша гілка = стара лінія з усіма пройденими точками (включно зі спільною).
     session.branches = [
       {
         line:           session.line,
@@ -204,17 +214,24 @@ export async function switchLine(newLine: Line): Promise<SwitchResult> {
       },
     ];
   } else {
+    // Закриваємо поточну гілку: її точки = пройдені, ще не приписані попереднім гілкам.
     const lastBranch = session.branches[session.branches.length - 1];
     lastBranch.completedSlugs = session.completedSlugs.filter(
       slug => !session.branches!
         .slice(0, -1)
         .some(b => b.completedSlugs.includes(slug)),
     );
+    // Спільна точка має лишитись у старій гілці (квіз пройдено саме тут).
+    if (!lastBranch.completedSlugs.includes(sharedSlug)) {
+      lastBranch.completedSlugs.push(sharedSlug);
+    }
   }
 
+  // Відкриваємо нову гілку. Спільна точка ОДРАЗУ зарахована їй (за моделлю — обом гілкам),
+  // бо квіз на ній уже пройдено й повторювати не треба.
   session.branches.push({
     line:           newLine,
-    completedSlugs: [],
+    completedSlugs: [sharedSlug],
     enteredAt:      new Date().toISOString(),
   });
 
