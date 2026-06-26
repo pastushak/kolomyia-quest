@@ -2,6 +2,7 @@
 
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { signIn } from 'next-auth/react';
 
 function LoginForm() {
   const router       = useRouter();
@@ -40,6 +41,22 @@ function LoginForm() {
       </div>
 
       <div style={{ background: '#fff', borderRadius: 20, padding: '28px 24px', boxShadow: '0 2px 16px rgba(0,0,0,0.06)' }}>
+        {/* Основний вхід — Google-роль admin (ADMIN_EMAILS) */}
+        <button
+          onClick={() => signIn('google', { callbackUrl: from })}
+          style={{ width: '100%', padding: '13px', borderRadius: 12, border: '1.5px solid #EEEEF5', background: '#fff', color: '#1a1a2e', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}
+        >
+          <span style={{ fontSize: 16 }}>🔓</span>
+          Увійти через Google
+        </button>
+
+        {/* Розділювач */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '20px 0' }}>
+          <div style={{ flex: 1, height: 1, background: '#EEEEF5' }} />
+          <span style={{ fontSize: 12, color: '#bbb' }}>або пароль (запасний)</span>
+          <div style={{ flex: 1, height: 1, background: '#EEEEF5' }} />
+        </div>
+
         <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#555', marginBottom: 8 }}>
           Пароль
         </label>

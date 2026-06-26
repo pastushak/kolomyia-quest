@@ -22,6 +22,10 @@ const UserSchema = new Schema({
   name:      { type: String, required: true },
   avatarUrl: { type: String, default: '' },
 
+  // Роль для доступу до адмінки. 'admin' проставляється з ADMIN_EMAILS при логіні
+  // (див. auth.ts), або вручну в БД для підвищених юзерів.
+  role:      { type: String, enum: ['user', 'admin'], default: 'user' },
+
   totalXp:        { type: Number, default: 0 },
   completedLines: { type: [CompletedLineSchema], default: [] },
 

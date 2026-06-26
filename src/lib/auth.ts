@@ -4,6 +4,16 @@ import mongoose from 'mongoose';
 import { connectDB } from '@/lib/mongodb';
 import { UserModel } from '@/lib/models/User';
 
+// Email-и зі змінної ADMIN_EMAILS (через кому) отримують роль admin при логіні.
+// Напр.: ADMIN_EMAILS="roman@gmail.com, team@gmail.com"
+function isAdminEmail(email: string): boolean {
+  const list = (process.env.ADMIN_EMAILS ?? '')
+    .split(',')
+    .map(e => e.trim().toLowerCase())
+    .filter(Boolean);
+  return list.includes(email.toLowerCase());
+}
+
 /**
  * NextAuth v5 config.
  *
@@ -50,6 +60,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       try {
         await connectDB();
 
+        const shouldBeAdmin = isAdminEmail(user.email);
+
         await UserModel.findOneAndUpdate(
           { email: user.email.toLowerCase() },
           {
@@ -58,6 +70,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               name: user.name ?? 'Турист',
               avatarUrl: user.image ?? '',
               lastLoginAt: new Date(),
+              // email в allow-list → завжди admin. Прибрали з allow-list — впаде до 'user'.
+              // Юзери, підвищені ВРУЧНУ в БД (не через ADMIN_EMAILS), не перетираються:
+              // для них блок нижче не виконується (бо shouldBeAdmin === false → поле не чіпаємо).
+              ...(shouldBeAdmin ? { role: 'admin' } : {}),
             },
             $setOnInsert: {
               email: user.email.toLowerCase(),
@@ -85,10 +101,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           await connectDB();
           const dbUser = await UserModel
             .findOne({ email: user.email.toLowerCase() })
-            .select('_id')
-            .lean<{ _id: mongoose.Types.ObjectId }>();
+            .select('_id role')
+            .lean<{ _id: mongoose.Types.ObjectId; role?: string }>();
           if (dbUser) {
             token.userId = dbUser._id.toString();
+            token.role = (dbUser.role as 'user' | 'admin') ?? 'user';
           }
         } catch (err) {
           console.error('jwt callback error:', err);
@@ -103,6 +120,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async session({ session, token }) {
       if (session.user && token.userId) {
         session.user.id = token.userId as string;
+      }
+      if (session.user) {
+        session.user.role = token.role ?? 'user';
       }
       return session;
     },
