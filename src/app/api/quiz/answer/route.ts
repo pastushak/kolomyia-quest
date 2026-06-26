@@ -10,16 +10,19 @@ const MAX_ATTEMPTS = 3;
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { slug, line, answerIndex, attempt, sessionId } = body as {
+    const { slug, line, answerIndex, sessionId } = body as {
       slug?: string;
       line?: string;
       answerIndex?: number;
-      attempt?: number;
       sessionId?: string;
     };
 
-    if (!slug || typeof answerIndex !== 'number' || typeof attempt !== 'number') {
-      return NextResponse.json({ error: 'slug, answerIndex, attempt required' }, { status: 400 });
+    // attempt більше НЕ приймаємо з клієнта — сервер рахує сам (анти-чит).
+    if (!slug || typeof answerIndex !== 'number') {
+      return NextResponse.json({ error: 'slug, answerIndex required' }, { status: 400 });
+    }
+    if (!sessionId) {
+      return NextResponse.json({ error: 'sessionId required' }, { status: 400 });
     }
 
     await connectDB();
@@ -28,12 +31,43 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Spot not found' }, { status: 404 });
     }
 
-    // Знаходимо квіз потрібної лінії (quizzes — масив per-line)
+    // Знаходимо квіз САМЕ потрібної лінії (quizzes — масив per-line).
+    // Без фолбеку на quizzes[0]: для shared-споту це віддало б питання чужої лінії.
     const quizzes = Array.isArray(spot.quizzes) ? spot.quizzes : [];
-    const quiz = quizzes.find((q: any) => q.line === line) ?? quizzes[0];
+    const quiz = line ? quizzes.find((q: any) => q.line === line) : undefined;
     if (!quiz) {
-      return NextResponse.json({ error: 'Quiz not available' }, { status: 404 });
+      return NextResponse.json(
+        { error: line ? 'Quiz not available for this line' : 'line required' },
+        { status: line ? 404 : 400 },
+      );
     }
+
+    // Якщо точку вже зараховано — питання закрите, спробу не витрачаємо.
+    const existing = await SessionModel
+      .findById(sessionId)
+      .select('completedSlugs quizAttempts')
+      .lean<{ completedSlugs: string[]; quizAttempts?: Record<string, number> }>();
+    if (existing?.completedSlugs?.includes(slug)) {
+      return NextResponse.json({ error: 'Quiz already completed for this spot' }, { status: 409 });
+    }
+
+    // СЕРВЕРНИЙ номер спроби: атомарно інкрементуємо лічильник per-slug.
+    // Клієнтський attempt ігнорується повністю — анти-чит.
+    const incKey = `quizAttempts.${slug}`;
+    const updated = await SessionModel.findByIdAndUpdate(
+      sessionId,
+      { $inc: { [incKey]: 1 } },
+      { new: true },
+    ).select('quizAttempts').lean<{ quizAttempts?: Record<string, number> | Map<string, number> }>();
+
+    if (!updated) {
+      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+    }
+
+    // Map (Mongoose) чи plain object (lean) — дістаємо однаково.
+    const attemptsField: any = updated.quizAttempts;
+    const attempt: number =
+      (attemptsField instanceof Map ? attemptsField.get(slug) : attemptsField?.[slug]) ?? 1;
 
     const correct   = answerIndex === quiz.correctIndex;
     const exhausted = attempt >= MAX_ATTEMPTS;
@@ -66,6 +100,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         correct: true,
         xpEarned,
+        attemptNumber: attempt,
         sessionXp,                          // актуальний серверний баланс сесії
         explanation: quiz.explanation ?? '',
       });
@@ -79,6 +114,7 @@ export async function POST(req: NextRequest) {
         exhausted: true,
         correctIndex: quiz.correctIndex,
         xpEarned: 0,
+        attemptNumber: attempt,
         sessionXp,
         explanation: quiz.explanation ?? '',
       });
@@ -88,6 +124,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       correct: false,
       exhausted: false,
+      attemptNumber: attempt,
       remainingAttempts: MAX_ATTEMPTS - attempt,
     });
   } catch (err) {

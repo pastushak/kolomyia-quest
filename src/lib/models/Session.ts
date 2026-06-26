@@ -46,6 +46,10 @@ const SessionSchema = new Schema(
       default: [],
     },
     transferCount: { type: Number, default: 0 },
+
+    // Серверний лічильник спроб квізу per-slug (ключ = slug, значення = к-сть спроб).
+    // Джерело істини для XP-драбинки. Клієнтський attempt НЕ враховується.
+    quizAttempts: { type: Map, of: Number, default: {} },
   },
   { timestamps: true },
 );

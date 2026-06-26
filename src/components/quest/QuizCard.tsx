@@ -24,6 +24,7 @@ export default function QuizCard({ questions, slug, line, lineColor, onComplete 
     exhausted?:   boolean;
     correctIndex?: number;
     xpEarned?:    number;
+    attemptNumber?: number;
     explanation?: string;
     remainingAttempts?: number;
   } | null>(null);
@@ -47,10 +48,12 @@ export default function QuizCard({ questions, slug, line, lineColor, onComplete 
       const res = await fetch('/api/quiz/answer', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug, line, answerIndex: selected, attempt, sessionId: getDbSessionId() }),
+        body: JSON.stringify({ slug, line, answerIndex: selected, sessionId: getDbSessionId() }),
       });
       const data = await res.json();
       setResult(data);
+      // Лічильник спроб веде сервер — синхронізуємо відображення.
+      if (typeof data.attemptNumber === 'number') setAttempt(data.attemptNumber);
       if (typeof data.sessionXp === 'number') setSessionXp(data.sessionXp);
     } catch {
       // Помилка мережі — не витрачаємо спробу, даємо повторити
@@ -61,8 +64,7 @@ export default function QuizCard({ questions, slug, line, lineColor, onComplete 
   }
 
   function handleRetry() {
-    // Наступна спроба того ж питання — спроба згоріла, вибір скидаємо.
-    setAttempt(a => a + 1);
+    // Наступна спроба того ж питання — номер спроби визначить сервер при submit.
     setSelected(null);
     setResult(null);
   }
@@ -115,7 +117,8 @@ export default function QuizCard({ questions, slug, line, lineColor, onComplete 
       {/* Лічильник спроб */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, color: '#8888A8' }}>
         <span>Питання {current + 1} з {questions.length}</span>
-        <span>Спроба {Math.min(attempt, MAX_ATTEMPTS)} з {MAX_ATTEMPTS}</span>
+        {/* Поки висить невдалий результат (можна ще раз) — показуємо НАСТУПНИЙ номер спроби */}
+        <span>Спроба {Math.min(answered && !result?.correct && !isExhausted ? attempt + 1 : attempt, MAX_ATTEMPTS)} з {MAX_ATTEMPTS}</span>
       </div>
 
       {/* Питання */}
