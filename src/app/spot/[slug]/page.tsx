@@ -213,6 +213,7 @@ export default function SpotPage() {
                 correctIndex: -1,        // не використовується (перевірка на сервері)
                 explanation:  quiz.explanation ?? '',
               }]}
+              qid={quiz.qid}
               slug={slug}
               line={line}
               lineColor={color}

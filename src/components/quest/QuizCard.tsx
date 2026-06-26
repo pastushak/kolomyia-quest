@@ -6,6 +6,7 @@ import { getDbSessionId } from '@/lib/session';
 
 interface Props {
   questions:  QuizQuestion[];   // correctIndex тут НЕ використовується (його нема з API)
+  qid:        string;           // стабільний id показаного питання — сервер перевірить саме його
   slug:       string;
   line:       string;
   lineColor:  string;
@@ -14,7 +15,7 @@ interface Props {
 
 const MAX_ATTEMPTS = 3;
 
-export default function QuizCard({ questions, slug, line, lineColor, onComplete }: Props) {
+export default function QuizCard({ questions, qid, slug, line, lineColor, onComplete }: Props) {
   const [current, setCurrent]     = useState(0);
   const [selected, setSelected]   = useState<number | null>(null);   // обраний варіант (ще не підтверджений)
   const [attempt, setAttempt]     = useState(1);
@@ -48,7 +49,7 @@ export default function QuizCard({ questions, slug, line, lineColor, onComplete 
       const res = await fetch('/api/quiz/answer', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug, line, answerIndex: selected, sessionId: getDbSessionId() }),
+        body: JSON.stringify({ slug, line, qid, answerIndex: selected, sessionId: getDbSessionId() }),
       });
       const data = await res.json();
       setResult(data);

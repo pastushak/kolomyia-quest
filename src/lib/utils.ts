@@ -1,4 +1,5 @@
 import { Line, Location, QuestLine } from '@/types';
+import { pickWeightedQuiz, quizQid } from '@/lib/quiz';
 
 // ── Кольори ліній (з логотипу Коломиї) ───────────────────
 export const LINE_COLOR: Record<Line, string> = {
@@ -66,10 +67,13 @@ export function getNextSlug(
 }
 
 // ── Квіз для конкретної лінії на споті ───────────────────
+// Зважений рандом серед питань лінії (weight>0). Додаємо qid — стабільний
+// ідентифікатор показаного питання, щоб сервер перевірив саме його.
 export function getQuizForLine(
   spot: Location,
   line: Line,
 ) {
-  if (!spot.quizzes || spot.quizzes.length === 0) return null;
-  return spot.quizzes.find(q => q.line === line) ?? null;
+  const picked = pickWeightedQuiz(spot.quizzes, line);
+  if (!picked) return null;
+  return { ...picked, qid: quizQid(picked.question) };
 }

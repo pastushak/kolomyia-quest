@@ -26,6 +26,7 @@ export interface LineQuiz {
   options:      string[];
   correctIndex: number;
   explanation:  string;
+  weight?:      number;   // вага для зваженого рандому; undefined → 1, 0 → вимкнено
 }
 
 // ── Локація (з MongoDB) ───────────────────────────────────

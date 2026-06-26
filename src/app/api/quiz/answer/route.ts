@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import { SpotModel } from '@/lib/models/Spot';
 import { SessionModel } from '@/lib/models/Session';
+import { findQuizByQid } from '@/lib/quiz';
 
 // Драбинка XP за номером спроби (1 → 100, 2 → 50, 3 → 25, далі → 0)
 const XP_LADDER = [100, 50, 25];
@@ -10,9 +11,10 @@ const MAX_ATTEMPTS = 3;
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { slug, line, answerIndex, sessionId } = body as {
+    const { slug, line, qid, answerIndex, sessionId } = body as {
       slug?: string;
       line?: string;
+      qid?: string;
       answerIndex?: number;
       sessionId?: string;
     };
@@ -31,15 +33,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Spot not found' }, { status: 404 });
     }
 
-    // Знаходимо квіз САМЕ потрібної лінії (quizzes — масив per-line).
-    // Без фолбеку на quizzes[0]: для shared-споту це віддало б питання чужої лінії.
-    const quizzes = Array.isArray(spot.quizzes) ? spot.quizzes : [];
-    const quiz = line ? quizzes.find((q: any) => q.line === line) : undefined;
+    // Шукаємо САМЕ показане питання за його qid (бо вибірка рандомна).
+    // Це гарантує, що звіряємо ту відповідь, яку турист реально бачив.
+    type DbQuiz = {
+      line: string;
+      question: string;
+      options: string[];
+      correctIndex: number;
+      explanation?: string;
+      weight?: number;
+    };
+    const quizzes: DbQuiz[] = Array.isArray(spot.quizzes) ? spot.quizzes : [];
+    if (!qid) {
+      return NextResponse.json({ error: 'qid required' }, { status: 400 });
+    }
+    const quiz = findQuizByQid(quizzes, qid);
     if (!quiz) {
-      return NextResponse.json(
-        { error: line ? 'Quiz not available for this line' : 'line required' },
-        { status: line ? 404 : 400 },
-      );
+      return NextResponse.json({ error: 'Quiz not found for qid' }, { status: 404 });
     }
 
     // Якщо точку вже зараховано — питання закрите, спробу не витрачаємо.

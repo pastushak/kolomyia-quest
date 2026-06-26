@@ -8,6 +8,8 @@ const LineQuizSchema = new Schema(
     options:      { type: [String], required: true },
     correctIndex: { type: Number, required: true },
     explanation:  { type: String, default: '' },
+    // Вага для зваженого рандому. 0 = вимкнено. Наявні питання без поля → трактуються як 1.
+    weight:       { type: Number, default: 1 },
   },
   { _id: false },
 );
