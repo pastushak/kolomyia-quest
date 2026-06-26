@@ -405,21 +405,34 @@ async function seed() {
   });
   console.log('✅ Підключено!');
 
-  // ── Споти ────────────────────────────────────────────────
-  console.log('🗺️  Очищуємо колекцію Spots...');
-  await SpotModel.deleteMany({});
+  // ── Споти (БЕЗПЕЧНИЙ upsert — НЕ чіпає quizzes з адмінки) ─────────
+  console.log(`📍 Upsert ${SPOTS.length} спотів (quizzes зберігаються)...`);
+  for (const spot of SPOTS) {
+    // Оновлюємо лише структурні поля. quizzes навмисно НЕ чіпаємо —
+    // щоб контент, доданий через адмінку, не затирався сідом.
+    const { quizzes, ...structuralFields } = spot;
+    await SpotModel.updateOne(
+      { slug: spot.slug },
+      {
+        $set: structuralFields,
+        // quizzes ставимо ТІЛЬКИ при першому створенні (insert), не при оновленні:
+        $setOnInsert: { quizzes: quizzes ?? null },
+      },
+      { upsert: true },
+    );
+  }
+  console.log('✅ Споти upsert-нуто (наявні quizzes збережено)!');
 
-  console.log(`📍 Вставляємо ${SPOTS.length} спотів...`);
-  await SpotModel.insertMany(SPOTS);
-  console.log('✅ Споти вставлено!');
-
-  // ── Лінії ────────────────────────────────────────────────
-  console.log('🚇 Очищуємо колекцію QuestLines...');
-  await QuestLineModel.deleteMany({});
-
-  console.log(`🎨 Вставляємо ${LINES.length} лінії...`);
-  await QuestLineModel.insertMany(LINES);
-  console.log('✅ Лінії вставлено!');
+  // ── Лінії (upsert) ───────────────────────────────────────
+  console.log(`🎨 Upsert ${LINES.length} ліній...`);
+  for (const lineDoc of LINES) {
+    await QuestLineModel.updateOne(
+      { key: lineDoc.key },
+      { $set: lineDoc },
+      { upsert: true },
+    );
+  }
+  console.log('✅ Лінії upsert-нуто!');
 
   // ── Підсумок ─────────────────────────────────────────────
   const spotCount = await SpotModel.countDocuments();
