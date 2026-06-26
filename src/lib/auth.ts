@@ -33,7 +33,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
-        secure: false,
+        // localhost — false (HTTP); прод (HTTPS, кастомний домен) — true
+        secure: process.env.NODE_ENV === 'production',
       },
     },
   },

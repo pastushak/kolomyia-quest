@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { getSession, completeSpot, trackQrScan, switchLine } from '@/lib/session';
 import { LINE_COLOR, LINE_LABEL, getNextSlug, getQuizForLine } from '@/lib/utils';
-import { Location } from '@/types';
+import { Location, Line } from '@/types';
 import HudzykMascot from '@/components/quest/HudzykMascot';
 import LocationCard from '@/components/quest/LocationCard';
 import QuizCard from '@/components/quest/QuizCard';
@@ -126,7 +126,7 @@ export default function SpotPage() {
   }
 
   // Пересадка на іншу лінію зі спільної точки.
-  async function handleTransfer(toLine: string) {
+  async function handleTransfer(toLine: Line) {
     if (!session?.userId) {
       alert('Щоб пересідати між лініями, потрібно увійти через Google.');
       return;

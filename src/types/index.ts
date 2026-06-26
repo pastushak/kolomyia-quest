@@ -69,6 +69,14 @@ export interface Session {
   bonusXp:        number;
   startedAt:      string;
   userId?:        string;
+  branches?:      SessionBranch[];
+  transferCount?: number;
+}
+
+export interface SessionBranch {
+  line:           Line;
+  completedSlugs: string[];
+  enteredAt:      string;
 }
 
 // ── Профіль залогіненого користувача ─────────────────────
