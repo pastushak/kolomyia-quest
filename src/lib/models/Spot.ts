@@ -3,7 +3,7 @@ import { Schema, model, models } from 'mongoose';
 // Підсхема одного питання квізу, прив'язаного до лінії
 const LineQuizSchema = new Schema(
   {
-    line:         { type: String, enum: ['cherry', 'orange', 'green'], required: true },
+    line:         { type: String, required: true },
     question:     { type: String, required: true },
     options:      { type: [String], required: true },
     correctIndex: { type: Number, required: true },
@@ -41,14 +41,12 @@ const SpotSchema = new Schema(
     // Яким лініям належить цей спот
     lines: {
       type:    [String],
-      enum:    ['cherry', 'orange', 'green'],
       default: [],
     },
 
     // На які лінії можна пересісти з цього споту
     transfers: {
       type:    [String],
-      enum:    ['cherry', 'orange', 'green'],
       default: [],
     },
 

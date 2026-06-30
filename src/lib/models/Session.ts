@@ -7,7 +7,6 @@ const SessionSchema = new Schema(
     // Три лінії маршруту Коломиї
     line: {
       type:     String,
-      enum:     ['cherry', 'orange', 'green'],
       required: true,
     },
 
@@ -38,7 +37,7 @@ const SessionSchema = new Schema(
     branches: {
       type: [
         {
-          line:           { type: String, enum: ['cherry', 'orange', 'green'] },
+          line:           { type: String },
           completedSlugs: { type: [String], default: [] },
           enteredAt:      { type: Date, default: Date.now },
         },

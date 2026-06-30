@@ -5,7 +5,6 @@ const QuestLineSchema = new Schema(
     // Унікальний ключ лінії: 'cherry' | 'orange' | 'green'
     key: {
       type:     String,
-      enum:     ['cherry', 'orange', 'green'],
       required: true,
       unique:   true,
       index:    true,

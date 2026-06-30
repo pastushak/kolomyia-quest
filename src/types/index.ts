@@ -1,5 +1,6 @@
 // ── Лінії маршрутів ──────────────────────────────────────
-export type Line = 'cherry' | 'orange' | 'green';
+export type Line = string;
+export type KnownLine = 'cherry' | 'orange' | 'green';
 export type LocationType = 'start' | 'regular' | 'shared' | 'finish';
 
 // ── Вікові групи ─────────────────────────────────────────
