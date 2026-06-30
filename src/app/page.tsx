@@ -263,6 +263,7 @@ export default function HomePage() {
               selectedLine === 'cherry' ? 'На вокзал — вперед!' :
               selectedLine === 'orange' ? 'До автовокзалу!' :
               selectedLine === 'green'  ? 'На площу Скорботи!' :
+              selectedLine ? 'Гарного маршруту!' :
               isLoggedIn ? `Привіт, ${nickname}!` :
               'Обери маршрут!'
             }
@@ -361,8 +362,43 @@ export default function HomePage() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {lines.map(line => {
-                const active = selectedLine === line.key;
-                const emoji  = LINE_EMOJI[line.key as Line];
+                const isDraft = line.status === 'draft';
+                const isThemed = line.theme === 'themed';
+                const active = !isDraft && selectedLine === line.key;
+                const emoji  = LINE_EMOJI[line.key as Line] ?? '🧭';   // фолбек для нових ліній
+
+                // ── Чернетка: невибірна заглушка "незабаром" ──
+                if (isDraft) {
+                  return (
+                    <div
+                      key={line.key}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 14,
+                        padding: '14px 16px', borderRadius: 14,
+                        border: `2px dashed ${line.color}40`,
+                        background: 'var(--white)', opacity: 0.7,
+                      }}
+                    >
+                      <div style={{ width: 44, height: 44, borderRadius: 12, background: line.color + '15', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>
+                        {emoji}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 6 }}>
+                          {line.label}
+                          {isThemed && <span style={{ fontSize: 10, fontWeight: 800, color: line.color, background: line.color + '20', borderRadius: 6, padding: '1px 6px' }}>Т</span>}
+                        </div>
+                        <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                          {line.description?.trim() || 'Незабаром з\'явиться новий маршрут…'}
+                        </div>
+                      </div>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', background: 'var(--border)', borderRadius: 8, padding: '3px 8px', flexShrink: 0 }}>
+                        скоро
+                      </span>
+                    </div>
+                  );
+                }
+
+                // ── Робоча лінія ──
                 return (
                   <button
                     key={line.key}
@@ -379,11 +415,12 @@ export default function HomePage() {
                       {emoji}
                     </div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: active ? line.color : 'var(--ink)', marginBottom: 3 }}>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: active ? line.color : 'var(--ink)', marginBottom: 3, display: 'flex', alignItems: 'center', gap: 6 }}>
                         {line.label}
+                        {isThemed && <span style={{ fontSize: 10, fontWeight: 800, color: line.color, background: line.color + '20', borderRadius: 6, padding: '1px 6px' }}>Т</span>}
                       </div>
                       <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-                        {line.order.length} точок · {line.startSlug === 'train_station' ? 'Залізничний вокзал' : line.startSlug === 'bus_station' ? 'Автовокзал' : 'Площа Скорботи'}
+                        {line.order.length} точок{line.startSlug === 'train_station' ? ' · Залізничний вокзал' : line.startSlug === 'bus_station' ? ' · Автовокзал' : line.startSlug === 'ploshcha_skorboty' ? ' · Площа Скорботи' : ''}
                       </div>
                     </div>
                     <div style={{ width: 22, height: 22, borderRadius: '50%', flexShrink: 0, border: `2px solid ${active ? line.color : 'var(--border)'}`, background: active ? line.color : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
