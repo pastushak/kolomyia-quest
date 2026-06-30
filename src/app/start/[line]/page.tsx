@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { getSession } from '@/lib/session';
 import { Session } from '@/types';
-import { LINE_COLOR, LINE_LABEL } from '@/lib/utils';
+import { lineColor, lineLabel } from '@/lib/utils';
 import { Line, Location } from '@/types';
 import HudzykMascot from '@/components/quest/HudzykMascot';
 
@@ -51,8 +51,8 @@ export default function StartPage() {
   if (!mounted) return null;
   if (!session) return null;
 
-  const color          = LINE_COLOR[line];
-  const label          = LINE_LABEL[line];
+  const color          = lineColor(line);
+  const label          = lineLabel(line);
   const completedSlugs = session.completedSlugs ?? [];
   const completedCount = completedSlugs.length;
   const hasProgress    = completedCount > 0;

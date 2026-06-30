@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { Line, QuestLine } from '@/types';
 import { createSession, getSession } from '@/lib/session';
-import { LINE_EMOJI } from '@/lib/utils';
+import { lineEmoji, registerLines } from '@/lib/utils';
 import HudzykMascot from '@/components/quest/HudzykMascot';
 
 const VIDEO_URL = 'https://www.dropbox.com/scl/fi/gf1gta8sh58crr51sv0vg/video_start.mp4?rlkey=hzwinaii2oxv6djxapv4t1s6e&st=wu9rbqgn&raw=1';
@@ -42,7 +42,7 @@ export default function HomePage() {
   useEffect(() => {
     fetch('/api/lines')
       .then(r => r.json())
-      .then(data => { setLines(data); setLinesLoading(false); })
+      .then(data => { if (Array.isArray(data)) registerLines(data); setLines(data); setLinesLoading(false); })
       .catch(() => setLinesLoading(false));
   }, []);
 
@@ -365,7 +365,7 @@ export default function HomePage() {
                 const isDraft = line.status === 'draft';
                 const isThemed = line.theme === 'themed';
                 const active = !isDraft && selectedLine === line.key;
-                const emoji  = LINE_EMOJI[line.key as Line] ?? '🧭';   // фолбек для нових ліній
+                const emoji  = lineEmoji(line.key);   // фолбек для нових ліній
 
                 // ── Чернетка: невибірна заглушка "незабаром" ──
                 if (isDraft) {

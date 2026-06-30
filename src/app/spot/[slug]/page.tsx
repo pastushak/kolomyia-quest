@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { getSession, completeSpot, trackQrScan, switchLine } from '@/lib/session';
-import { LINE_COLOR, LINE_LABEL, getNextSlug, getQuizForLine } from '@/lib/utils';
+import { lineColor, lineLabel, ensureLinesRegistered, getNextSlug, getQuizForLine } from '@/lib/utils';
 import { Location, Line } from '@/types';
 import HudzykMascot from '@/components/quest/HudzykMascot';
 import LocationCard from '@/components/quest/LocationCard';
@@ -34,6 +34,7 @@ export default function SpotPage() {
     const s = getSession();
     if (!s) { router.push('/'); return; }
     setSession(s);
+    ensureLinesRegistered();   // кольори/назви всіх ліній (для пересадок на чужі лінії)
 
     // Завантажуємо спот і порядок лінії паралельно
     Promise.all([
@@ -57,7 +58,7 @@ export default function SpotPage() {
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', flexDirection: 'column', gap: 12 }}>
-      <div style={{ width: 36, height: 36, border: '3px solid #eee', borderTopColor: LINE_COLOR[session.line], borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+      <div style={{ width: 36, height: 36, border: '3px solid #eee', borderTopColor: lineColor(session.line), borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
       <span style={{ fontSize: 14, color: '#888' }}>Завантаження...</span>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
@@ -72,7 +73,7 @@ export default function SpotPage() {
   );
 
   const line        = session.line;
-  const color       = LINE_COLOR[line];
+  const color       = lineColor(line);
   const spotIndex   = order.indexOf(slug);
   const spotNumber  = spotIndex + 1;
   const quiz        = getQuizForLine(spot, line);
@@ -131,7 +132,7 @@ export default function SpotPage() {
       alert('Щоб пересідати між лініями, потрібно увійти через Google.');
       return;
     }
-    if (!confirm(`Пересісти на ${LINE_LABEL[toLine]}? Перехід коштує 50 XP. Точки до місця пересадки на старій лінії лишаться непройденими.`)) {
+    if (!confirm(`Пересісти на ${lineLabel(toLine)}? Перехід коштує 50 XP. Точки до місця пересадки на старій лінії лишаться непройденими.`)) {
       return;
     }
 
@@ -165,7 +166,7 @@ export default function SpotPage() {
       <div style={{ background: '#fff', borderBottom: '1px solid #EEEEF5', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 10 }}>
         <button onClick={() => router.push(`/start/${line}`)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: '#8888A8' }}>←</button>
         <div style={{ width: 10, height: 10, borderRadius: '50%', background: color }} />
-        <span style={{ fontSize: 14, fontWeight: 700, color: '#1A1A2E' }}>{LINE_LABEL[line]}</span>
+        <span style={{ fontSize: 14, fontWeight: 700, color: '#1A1A2E' }}>{lineLabel(line)}</span>
         <div style={{ marginLeft: 'auto', background: '#FEF7E6', border: '1px solid #F5D78A', borderRadius: 20, padding: '4px 12px', fontSize: 13, fontWeight: 700, color: '#8B6914' }}>
           {session.xp} XP
         </div>
@@ -257,7 +258,7 @@ export default function SpotPage() {
                 cursor: switching ? 'default' : 'pointer', marginBottom: 12, opacity: switching ? 0.6 : 1,
               }}
             >
-              Продовжити {LINE_LABEL[line]} →
+              Продовжити {lineLabel(line)} →
             </button>
 
             {/* Пересадки на інші лінії */}
@@ -274,15 +275,15 @@ export default function SpotPage() {
                     disabled={switching}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 12,
-                      padding: '12px 14px', borderRadius: 14, border: `2px solid ${LINE_COLOR[t]}20`,
-                      background: LINE_COLOR[t] + '10', cursor: switching ? 'default' : 'pointer',
+                      padding: '12px 14px', borderRadius: 14, border: `2px solid ${lineColor(t)}20`,
+                      background: lineColor(t) + '10', cursor: switching ? 'default' : 'pointer',
                       textAlign: 'left', opacity: switching ? 0.6 : 1,
                     }}
                   >
-                    <div style={{ width: 12, height: 12, borderRadius: '50%', background: LINE_COLOR[t], flexShrink: 0 }} />
+                    <div style={{ width: 12, height: 12, borderRadius: '50%', background: lineColor(t), flexShrink: 0 }} />
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: LINE_COLOR[t] }}>
-                        {LINE_LABEL[t]}
+                      <div style={{ fontSize: 14, fontWeight: 700, color: lineColor(t) }}>
+                        {lineLabel(t)}
                       </div>
                       <div style={{ fontSize: 11, color: '#8888A8' }}>
                         Звернути на цю лінію

@@ -66,7 +66,9 @@ export function lineStart(line: string): string {
 export async function fetchLine(key: Line): Promise<QuestLine & { spots: Location[] }> {
   const res = await fetch(`/api/lines/${key}`, { cache: 'no-store' });
   if (!res.ok) throw new Error(`fetchLine failed: ${key}`);
-  return res.json();
+  const data = await res.json();
+  if (data?.key) registerLines([data]);   // реєструємо цю лінію (color/label для гетерів)
+  return data;
 }
 
 // ── Fetch всіх ліній (для стартової сторінки) ────────────

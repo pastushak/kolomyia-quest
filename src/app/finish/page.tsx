@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Session } from '@/types';
-import { fetchLine, LINE_COLOR, LINE_LABEL } from '@/lib/utils';
+import { fetchLine, lineColor, lineLabel } from '@/lib/utils';
 import HudzykMascot from '@/components/quest/HudzykMascot';
 import { getSession, clearSession, finishSession } from '@/lib/session';
 
@@ -44,8 +44,8 @@ export default function FinishPage() {
   if (!mounted || !session) return null;
 
   const line      = session.line;
-  const color     = LINE_COLOR[line];
-  const label     = LINE_LABEL[line];
+  const color     = lineColor(line);
+  const label     = lineLabel(line);
   const completed = session.completedSlugs.length;
   const total     = lineSpots.length;
   const xp        = session.xp;

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
-import { LINE_COLOR, LINE_LABEL } from '@/lib/utils';
+import { lineColor, lineLabel, ensureLinesRegistered } from '@/lib/utils';
 import { Line } from '@/types';
 
 interface CompletedLine {
@@ -71,6 +71,7 @@ export default function ProfilePage() {
       return;
     }
     if (status === 'authenticated') {
+      ensureLinesRegistered();   // підтягнути кольори/назви ліній (зокрема нових)
       fetch('/api/profile')
         .then(r => r.json())
         .then(data => { setProfile(data); setLoading(false); })
@@ -159,12 +160,12 @@ export default function ProfilePage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {ALL_LINES.map(line => {
               const done = profile.completedLines.find(l => l.line === line);
-              const color = LINE_COLOR[line];
+              const color = lineColor(line);
               return (
                 <div key={line} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px', borderRadius: 14, background: done ? color + '18' : '#faf8f5', opacity: done ? 1 : 0.5 }}>
                   <div style={{ width: 12, height: 12, borderRadius: '50%', background: color, flexShrink: 0 }} />
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: '#1a1a2e', marginBottom: 2 }}>{LINE_LABEL[line]}</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#1a1a2e', marginBottom: 2 }}>{lineLabel(line)}</div>
                     <div style={{ fontSize: 11, color: '#888' }}>
                       {done ? formatDate(done.completedAt) : 'Ще не пройдено'}
                     </div>

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Polyline, CircleMarker, Tooltip } from 'react-leaflet';
 import { Line, Location } from '@/types';
-import { LINE_COLOR } from '@/lib/utils';
+import { lineColor } from '@/lib/utils';
 import 'leaflet/dist/leaflet.css';
 
 // Базовий URL маршрутизатора. Замінити на власний OSRM/провайдер перед лончем —
@@ -22,7 +22,7 @@ export default function MapView({ line, locations, completedSlugs, activeSlug }:
   const [routePoints, setRoutePoints] = useState<[number, number][]>([]);
   const [routeLoading, setRouteLoading] = useState(true);
 
-  const color     = LINE_COLOR[line];
+  const color     = lineColor(line);
   const positions = locations.map(l => [l.lat, l.lng] as [number, number]);
   const center    = positions[Math.floor(positions.length / 2)];
 
