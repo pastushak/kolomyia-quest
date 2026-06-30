@@ -27,10 +27,10 @@ export default function StartPage() {
     const s = getSession();
     if (!s) { router.push('/'); return; }
 
-    // Захист від застарілих сесій на неіснуючій лінії (доміграційні red/blue)
-    const VALID_LINES = ['cherry', 'orange', 'green'];
-    if (!VALID_LINES.includes(s.line) || s.line !== line) {
-      // Лінія сесії не збігається з URL або взагалі недійсна — скидаємо
+    // Сесія має збігатися з лінією в URL (захист від застарілих сесій).
+    // Існування самої лінії підтвердить fetch нижче — без хардкод-whitelist,
+    // щоб нові тематичні лінії теж працювали.
+    if (s.line !== line) {
       localStorage.removeItem('kq_session');
       localStorage.removeItem('kq_sid');
       router.push('/');
@@ -39,13 +39,22 @@ export default function StartPage() {
     setSession(s);
 
     fetch(`/api/lines/${line}`)
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error('line not found');
+        return r.json();
+      })
       .then(data => {
+        if (!data || !Array.isArray(data.order)) throw new Error('invalid line');
         setSpots(data.spots);
         setOrder(data.order);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch(() => {
+        // Лінія не існує в БД — чистимо сесію й на головну
+        localStorage.removeItem('kq_session');
+        localStorage.removeItem('kq_sid');
+        router.push('/');
+      });
   }, [line]);
 
   if (!mounted) return null;
