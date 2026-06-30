@@ -259,6 +259,28 @@ export default function AdminPage() {
     setLineEditing(null);
   }
 
+  // ── Керування порядком спотів у маршруті (order) ──
+  function orderMove(idx: number, dir: -1 | 1) {
+    if (!lineEditing) return;
+    const order = [...(lineEditing.order || [])];
+    const j = idx + dir;
+    if (j < 0 || j >= order.length) return;
+    [order[idx], order[j]] = [order[j], order[idx]];
+    setLineEditing({ ...lineEditing, order });
+  }
+
+  function orderRemove(idx: number) {
+    if (!lineEditing) return;
+    const order = (lineEditing.order || []).filter((_: string, i: number) => i !== idx);
+    setLineEditing({ ...lineEditing, order });
+  }
+
+  function orderAdd(slug: string) {
+    if (!lineEditing || !slug) return;
+    if ((lineEditing.order || []).includes(slug)) return;
+    setLineEditing({ ...lineEditing, order: [...(lineEditing.order || []), slug] });
+  }
+
   // Порожній спот для форми створення
   function openCreate() {
     setEditing({
@@ -898,8 +920,54 @@ export default function AdminPage() {
                       style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1.5px solid #EEEEF5', fontSize: 13, outline: 'none', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }} />
                   </div>
 
-                  <div style={{ fontSize: 11, color: '#aaa', marginBottom: 16, lineHeight: 1.5 }}>
-                    Порядок спотів маршруту ({(lineEditing.order || []).length} точок) керується окремо — у наступному оновленні. Поки нова лінія порожня, тримай її в статусі «чернетка».
+                  {/* ── Порядок спотів маршруту (order) ── */}
+                  <div style={{ marginBottom: 16, paddingTop: 16, borderTop: '1px solid #EEEEF5' }}>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#1A1A2E', marginBottom: 10 }}>
+                      🛤️ Порядок спотів <span style={{ fontWeight: 400, color: '#888' }}>({(lineEditing.order || []).length})</span>
+                    </label>
+
+                    {(lineEditing.order || []).length === 0 && (
+                      <div style={{ fontSize: 12, color: '#aaa', padding: '8px 0', marginBottom: 8 }}>
+                        Маршрут порожній. Додай споти нижче — у тому порядку, в якому турист їх проходитиме.
+                      </div>
+                    )}
+
+                    {(lineEditing.order || []).map((slug: string, idx: number) => {
+                      const spot = spots.find(s => s.slug === slug);
+                      const last = idx === (lineEditing.order || []).length - 1;
+                      return (
+                        <div key={slug} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 10, border: '1.5px solid #EEEEF5', marginBottom: 6, background: spot ? '#fff' : '#FEF3E2' }}>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: '#888', minWidth: 22, textAlign: 'center' }}>{idx + 1}</span>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: '#1A1A2E' }}>{spot ? spot.name : slug}</div>
+                            <div style={{ fontSize: 10, color: '#aaa', fontFamily: 'monospace' }}>{slug}{!spot && ' · спот не знайдено'}</div>
+                          </div>
+                          <button onClick={() => orderMove(idx, -1)} disabled={idx === 0} style={{ width: 28, height: 28, borderRadius: 8, border: '1.5px solid #EEEEF5', background: '#fff', cursor: idx === 0 ? 'default' : 'pointer', opacity: idx === 0 ? 0.3 : 1, fontSize: 12 }}>↑</button>
+                          <button onClick={() => orderMove(idx, 1)} disabled={last} style={{ width: 28, height: 28, borderRadius: 8, border: '1.5px solid #EEEEF5', background: '#fff', cursor: last ? 'default' : 'pointer', opacity: last ? 0.3 : 1, fontSize: 12 }}>↓</button>
+                          <button onClick={() => orderRemove(idx)} style={{ width: 28, height: 28, borderRadius: 8, border: '1.5px solid #FECACA', background: '#fff', color: '#DC2626', cursor: 'pointer', fontSize: 12 }}>✕</button>
+                        </div>
+                      );
+                    })}
+
+                    {/* Додати спот */}
+                    <select
+                      value=""
+                      onChange={e => { orderAdd(e.target.value); e.target.value = ''; }}
+                      style={{ width: '100%', marginTop: 8, padding: '10px 12px', borderRadius: 10, border: '1.5px dashed #C9C9D4', fontSize: 13, outline: 'none', background: '#fff', cursor: 'pointer', color: '#555' }}
+                    >
+                      <option value="">+ Додати спот у маршрут…</option>
+                      {spots
+                        .filter(s => !(lineEditing.order || []).includes(s.slug))
+                        .map(s => (
+                          <option key={s.slug} value={s.slug}>{s.name} ({s.slug})</option>
+                        ))}
+                    </select>
+
+                    <div style={{ fontSize: 11, color: '#aaa', marginTop: 8, lineHeight: 1.5 }}>
+                      Стартова точка маршруту — перший спот у списку. Не забудь виставити «Стартова точка (slug)» вище на нього ж.
+                      <br />
+                      💡 Щоб на споті був квіз для цього маршруту, у нього мають бути питання з лінією «{lineEditing.key || '…'}» (додай через вкладку «Локації» → спот → Квізи).
+                    </div>
                   </div>
 
                   <div style={{ display: 'flex', gap: 10 }}>
