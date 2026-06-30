@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { LINE_COLOR, LINE_LABEL } from '@/lib/utils';
+import { lineColor, lineLabel, ensureLinesRegistered } from '@/lib/utils';
 import { Line } from '@/types';
 import QRCode from 'qrcode';
 
@@ -110,7 +110,7 @@ export default function AdminPage() {
 
   const BASE_URL = typeof window !== 'undefined' ? window.location.origin : '';
 
-  useEffect(() => { loadStats(); loadSpots(); loadShop(); }, []);
+  useEffect(() => { ensureLinesRegistered(); loadStats(); loadSpots(); loadShop(); }, []);
 
   // ── Stats ────────────────────────────────────────────────
 
@@ -358,11 +358,11 @@ export default function AdminPage() {
                     ].map(l => {
                       const total = (stats.cherryCount + stats.orangeCount + stats.greenCount) || 1;
                       const pct   = Math.round(l.count / total * 100);
-                      const color = LINE_COLOR[l.line as Line];
+                      const color = lineColor(l.line as Line);
                       return (
                         <div key={l.line} style={{ marginBottom: 14 }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                            <span style={{ fontSize: 13, fontWeight: 600, color }}>{LINE_LABEL[l.line as Line]}</span>
+                            <span style={{ fontSize: 13, fontWeight: 600, color }}>{lineLabel(l.line as Line)}</span>
                             <span style={{ fontSize: 13, fontWeight: 800, color }}>{l.count} <span style={{ fontSize: 11, color: '#aaa', fontWeight: 400 }}>({pct}%)</span></span>
                           </div>
                           <div style={{ height: 8, background: '#f0f0f5', borderRadius: 4, overflow: 'hidden' }}>
@@ -438,13 +438,13 @@ export default function AdminPage() {
                         {stats.recentSessions.length === 0 ? (
                           <tr><td colSpan={6} style={{ padding: '24px 0', textAlign: 'center', color: '#ccc' }}>Ще немає сесій</td></tr>
                         ) : stats.recentSessions.map((s, i) => {
-                          const color = LINE_COLOR[s.line as Line] ?? '#888';
+                          const color = lineColor(s.line as Line);
                           return (
                             <tr key={s.id} style={{ borderBottom: i < stats.recentSessions.length - 1 ? '1px solid #EEEEF5' : 'none' }}>
                               <td style={{ padding: '11px 16px', fontWeight: 700, color: '#1A1A2E' }}>{s.nickname}</td>
                               <td style={{ padding: '11px 16px' }}>
                                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20, background: color + '20', color }}>
-                                  {LINE_LABEL[s.line as Line] ?? s.line}
+                                  {lineLabel(s.line as Line)}
                                 </span>
                               </td>
                               <td style={{ padding: '11px 16px', fontWeight: 800, color: '#E8A020' }}>{s.xpTotal}</td>
@@ -488,8 +488,8 @@ export default function AdminPage() {
                 style={{ flex: 1, minWidth: 200, padding: '8px 14px', borderRadius: 10, border: '1.5px solid #EEEEF5', fontSize: 13, outline: 'none' }}
               />
               {(['all', 'cherry', 'orange', 'green'] as const).map(f => (
-                <button key={f} onClick={() => setFilter(f)} style={{ padding: '8px 16px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500, background: filter === f ? (f === 'all' ? '#1A1A2E' : LINE_COLOR[f as Line]) : '#F0F0F5', color: filter === f ? '#fff' : '#555' }}>
-                  {f === 'all' ? 'Всі' : LINE_LABEL[f as Line]}
+                <button key={f} onClick={() => setFilter(f)} style={{ padding: '8px 16px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500, background: filter === f ? (f === 'all' ? '#1A1A2E' : lineColor(f as Line)) : '#F0F0F5', color: filter === f ? '#fff' : '#555' }}>
+                  {f === 'all' ? 'Всі' : lineLabel(f as Line)}
                 </button>
               ))}
             </div>
@@ -511,8 +511,8 @@ export default function AdminPage() {
                     </div>
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 10 }}>
                       {spot.lines.map(l => (
-                        <span key={l} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, fontWeight: 600, background: LINE_COLOR[l as Line] + '20', color: LINE_COLOR[l as Line] }}>
-                          {LINE_LABEL[l as Line]}
+                        <span key={l} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, fontWeight: 600, background: lineColor(l as Line) + '20', color: lineColor(l as Line) }}>
+                          {lineLabel(l as Line)}
                         </span>
                       ))}
                     </div>
@@ -588,8 +588,8 @@ export default function AdminPage() {
                           const on = editing.lines.includes(l);
                           return (
                             <button key={l} onClick={() => setEditing({ ...editing, lines: on ? editing.lines.filter(x => x !== l) : [...editing.lines, l] })}
-                              style={{ padding: '6px 12px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, background: on ? LINE_COLOR[l] : LINE_COLOR[l] + '20', color: on ? '#fff' : LINE_COLOR[l] }}>
-                              {LINE_LABEL[l]} {on ? '✓' : ''}
+                              style={{ padding: '6px 12px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, background: on ? lineColor(l) : lineColor(l) + '20', color: on ? '#fff' : lineColor(l) }}>
+                              {lineLabel(l)} {on ? '✓' : ''}
                             </button>
                           );
                         })}
@@ -602,8 +602,8 @@ export default function AdminPage() {
                           const on = editing.transfers.includes(l);
                           return (
                             <button key={l} onClick={() => setEditing({ ...editing, transfers: on ? editing.transfers.filter(x => x !== l) : [...editing.transfers, l] })}
-                              style={{ padding: '6px 12px', borderRadius: 20, border: `1.5px ${on ? 'solid' : 'dashed'} ${LINE_COLOR[l]}`, cursor: 'pointer', fontSize: 12, fontWeight: 600, background: on ? LINE_COLOR[l] + '15' : '#fff', color: LINE_COLOR[l] }}>
-                              {LINE_LABEL[l]} {on ? '✓' : ''}
+                              style={{ padding: '6px 12px', borderRadius: 20, border: `1.5px ${on ? 'solid' : 'dashed'} ${lineColor(l)}`, cursor: 'pointer', fontSize: 12, fontWeight: 600, background: on ? lineColor(l) + '15' : '#fff', color: lineColor(l) }}>
+                              {lineLabel(l)} {on ? '✓' : ''}
                             </button>
                           );
                         })}
@@ -639,8 +639,8 @@ export default function AdminPage() {
                         return (
                           <div key={line} style={{ marginBottom: 20 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                              <span style={{ fontSize: 12, fontWeight: 700, color: LINE_COLOR[line as Line], background: LINE_COLOR[line as Line] + '18', padding: '3px 10px', borderRadius: 20 }}>
-                                {LINE_LABEL[line as Line]} ({lineQuizzes.length})
+                              <span style={{ fontSize: 12, fontWeight: 700, color: lineColor(line as Line), background: lineColor(line as Line) + '18', padding: '3px 10px', borderRadius: 20 }}>
+                                {lineLabel(line as Line)} ({lineQuizzes.length})
                               </span>
                             </div>
 
@@ -701,8 +701,8 @@ export default function AdminPage() {
                               );
                             })}
 
-                            <button onClick={() => addQuizForLine(line)} style={{ padding: '8px 14px', borderRadius: 10, border: `1.5px dashed ${LINE_COLOR[line as Line]}`, background: '#fff', color: LINE_COLOR[line as Line], fontSize: 12, fontWeight: 600, cursor: 'pointer', marginTop: 4 }}>
-                              + Додати питання ({LINE_LABEL[line as Line]})
+                            <button onClick={() => addQuizForLine(line)} style={{ padding: '8px 14px', borderRadius: 10, border: `1.5px dashed ${lineColor(line as Line)}`, background: '#fff', color: lineColor(line as Line), fontSize: 12, fontWeight: 600, cursor: 'pointer', marginTop: 4 }}>
+                              + Додати питання ({lineLabel(line as Line)})
                             </button>
                           </div>
                         );
@@ -753,7 +753,7 @@ export default function AdminPage() {
             ) : (
               <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                 {spots.map(spot => {
-                  const color = spot.type === 'finish' ? '#7F77DD' : LINE_COLOR[spot.lines[0] as Line] ?? '#888';
+                  const color = spot.type === 'finish' ? '#7F77DD' : lineColor(spot.lines[0] as Line);
                   return <QRItem key={spot.slug} url={`${BASE_URL}/info/${spot.slug}`} label={spot.name} sublabel={spot.address} color={color} />;
                 })}
               </div>
