@@ -49,10 +49,11 @@ interface QuizData {
   options:      string[];
   correctIndex: number;
   explanation:  string;
+  weight:       number;   // 0 = вимкнено, 1 = звичайна, 2+ = частіше
 }
 
 const EMPTY_QUIZ = (line: string): QuizData => ({
-  line, question: '', options: ['', '', '', ''], correctIndex: 0, explanation: '',
+  line, question: '', options: ['', '', '', ''], correctIndex: 0, explanation: '', weight: 1,
 });
 
 // ── QR компонент ──────────────────────────────────────────
@@ -95,7 +96,7 @@ export default function AdminPage() {
   const [saved, setSaved]         = useState(false);
   const [filter, setFilter]       = useState<string>('all');
   const [search, setSearch]       = useState('');
-  const [quizTab, setQuizTab]     = useState<string>('');
+  const [expandedQuiz, setExpandedQuiz] = useState<number | null>(null);   // індекс розгорнутого питання
   // Shop стан
   const [shopItems, setShopItems]   = useState<any[]>([]);
   const [shopLoading, setShopLoading] = useState(false);
@@ -142,23 +143,49 @@ export default function AdminPage() {
   }
 
   function openEdit(spot: SpotData) {
-    const existingQuizzes = spot.quizzes || [];
-    const quizzes = spot.lines.map(line => existingQuizzes.find(q => q.line === line) || EMPTY_QUIZ(line));
+    // ЗБЕРІГАЄМО ВСІ питання як є (раніше зрізалося до 1 на лінію — втрата даних).
+    // weight нормалізуємо: якщо в старих питань його немає → 1.
+    const quizzes: QuizData[] = (spot.quizzes || []).map((q: any) => ({
+      line:         q.line,
+      question:     q.question ?? '',
+      options:      Array.isArray(q.options) && q.options.length ? q.options : ['', '', '', ''],
+      correctIndex: typeof q.correctIndex === 'number' ? q.correctIndex : 0,
+      explanation:  q.explanation ?? '',
+      weight:       typeof q.weight === 'number' ? q.weight : 1,
+    }));
     setEditing({ ...spot, quizzes });
-    setQuizTab(spot.lines[0] || '');
+    setExpandedQuiz(null);
   }
 
-  function updateQuiz(line: string, field: keyof QuizData, value: any) {
+  // ── Хелпери працюють по ІНДЕКСУ питання в масиві (не по лінії) ──
+  function updateQuizAt(idx: number, field: keyof QuizData, value: any) {
     if (!editing) return;
-    setEditing({ ...editing, quizzes: (editing.quizzes || []).map(q => q.line === line ? { ...q, [field]: value } : q) });
+    const quizzes = [...(editing.quizzes || [])];
+    quizzes[idx] = { ...quizzes[idx], [field]: value };
+    setEditing({ ...editing, quizzes });
   }
 
-  function updateOption(line: string, idx: number, value: string) {
+  function updateOptionAt(idx: number, optIdx: number, value: string) {
     if (!editing) return;
-    setEditing({ ...editing, quizzes: (editing.quizzes || []).map(q => {
-      if (q.line !== line) return q;
-      const options = [...q.options]; options[idx] = value; return { ...q, options };
-    })});
+    const quizzes = [...(editing.quizzes || [])];
+    const options = [...quizzes[idx].options];
+    options[optIdx] = value;
+    quizzes[idx] = { ...quizzes[idx], options };
+    setEditing({ ...editing, quizzes });
+  }
+
+  function addQuizForLine(line: string) {
+    if (!editing) return;
+    const quizzes = [...(editing.quizzes || []), EMPTY_QUIZ(line)];
+    setEditing({ ...editing, quizzes });
+    setExpandedQuiz(quizzes.length - 1);   // одразу розгорнути нове
+  }
+
+  function deleteQuizAt(idx: number) {
+    if (!editing) return;
+    const quizzes = (editing.quizzes || []).filter((_, i) => i !== idx);
+    setEditing({ ...editing, quizzes });
+    setExpandedQuiz(null);
   }
 
   function isQuizFilled(q: QuizData) { return q.question.trim() && q.options.every(o => o.trim()); }
@@ -174,6 +201,7 @@ export default function AdminPage() {
   async function handleSave() {
     if (!editing) return;
     setSaving(true);
+    // Зберігаємо ВСІ заповнені питання (не по одному на лінію).
     const filledQuizzes = (editing.quizzes || []).filter(isQuizFilled);
     await fetch('/api/admin/spots', {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
@@ -194,8 +222,6 @@ export default function AdminPage() {
     const matchSearch = s.name.toLowerCase().includes(search.toLowerCase());
     return matchLine && matchSearch;
   });
-
-  const currentQuiz = editing?.quizzes?.find(q => q.line === quizTab);
 
   // ── Render ────────────────────────────────────────────────
 
@@ -474,45 +500,87 @@ export default function AdminPage() {
 
                   {editing.lines.length > 0 && (
                     <div style={{ marginTop: 8 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: '#1A1A2E', marginBottom: 12, paddingTop: 16, borderTop: '1px solid #EEEEF5' }}>🎯 Квізи</div>
-                      {editing.lines.length > 1 && (
-                        <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
-                          {editing.lines.map(line => {
-                            const q = editing.quizzes?.find(q => q.line === line);
-                            const filled = q ? isQuizFilled(q) : false;
-                            return (
-                              <button key={line} onClick={() => setQuizTab(line)} style={{ padding: '6px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, background: quizTab === line ? LINE_COLOR[line as Line] : LINE_COLOR[line as Line] + '20', color: quizTab === line ? '#fff' : LINE_COLOR[line as Line] }}>
-                                {LINE_LABEL[line as Line]} {filled ? '✓' : ''}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#1A1A2E', marginBottom: 12, paddingTop: 16, borderTop: '1px solid #EEEEF5' }}>
+                        🎯 Квізи <span style={{ fontWeight: 400, color: '#888' }}>({(editing.quizzes || []).length} питань)</span>
+                      </div>
 
-                      {currentQuiz && (
-                        <div style={{ background: '#faf8f5', borderRadius: 14, padding: 16 }}>
-                          <div style={{ marginBottom: 12 }}>
-                            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 6 }}>Питання</label>
-                            <textarea rows={2} value={currentQuiz.question} onChange={e => updateQuiz(quizTab, 'question', e.target.value)} placeholder="Введіть питання квізу..."
-                              style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1.5px solid #EEEEF5', fontSize: 13, outline: 'none', resize: 'vertical', fontFamily: 'inherit', background: '#fff', boxSizing: 'border-box' }} />
+                      {editing.lines.map(line => {
+                        // Питання цієї лінії + їхні реальні індекси в загальному масиві
+                        const lineQuizzes = (editing.quizzes || [])
+                          .map((q, idx) => ({ q, idx }))
+                          .filter(({ q }) => q.line === line);
+
+                        return (
+                          <div key={line} style={{ marginBottom: 20 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                              <span style={{ fontSize: 12, fontWeight: 700, color: LINE_COLOR[line as Line], background: LINE_COLOR[line as Line] + '18', padding: '3px 10px', borderRadius: 20 }}>
+                                {LINE_LABEL[line as Line]} ({lineQuizzes.length})
+                              </span>
+                            </div>
+
+                            {lineQuizzes.map(({ q, idx }) => {
+                              const filled   = isQuizFilled(q);
+                              const expanded = expandedQuiz === idx;
+                              const disabled = q.weight === 0;
+                              return (
+                                <div key={idx} style={{ border: '1.5px solid #EEEEF5', borderRadius: 12, marginBottom: 8, overflow: 'hidden', opacity: disabled ? 0.55 : 1 }}>
+                                  {/* Згорнутий рядок */}
+                                  <div onClick={() => setExpandedQuiz(expanded ? null : idx)}
+                                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', cursor: 'pointer', background: expanded ? '#faf8f5' : '#fff' }}>
+                                    <span style={{ fontSize: 11, color: '#aaa' }}>{expanded ? '▾' : '▸'}</span>
+                                    <span style={{ flex: 1, fontSize: 13, color: q.question.trim() ? '#1A1A2E' : '#bbb' }}>
+                                      {q.question.trim() || 'Порожнє питання...'}
+                                    </span>
+                                    <span style={{ fontSize: 10, fontWeight: 700, color: disabled ? '#DC2626' : '#888', background: disabled ? '#FEE2E2' : '#F1F1F6', padding: '2px 8px', borderRadius: 10, whiteSpace: 'nowrap' }}>
+                                      {disabled ? 'вимкн.' : `вага ${q.weight}`}
+                                    </span>
+                                    <span style={{ fontSize: 12 }}>{filled ? '✓' : '⚠️'}</span>
+                                  </div>
+
+                                  {/* Розгорнута форма */}
+                                  {expanded && (
+                                    <div style={{ padding: 16, borderTop: '1px solid #EEEEF5', background: '#faf8f5' }}>
+                                      <div style={{ marginBottom: 12 }}>
+                                        <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 6 }}>Питання</label>
+                                        <textarea rows={2} value={q.question} onChange={e => updateQuizAt(idx, 'question', e.target.value)} placeholder="Введіть питання квізу..."
+                                          style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1.5px solid #EEEEF5', fontSize: 13, outline: 'none', resize: 'vertical', fontFamily: 'inherit', background: '#fff', boxSizing: 'border-box' }} />
+                                      </div>
+                                      <div style={{ marginBottom: 12 }}>
+                                        <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 6 }}>Варіанти <span style={{ fontWeight: 400, color: '#888' }}>(клікни кружечок = правильна)</span></label>
+                                        {q.options.map((opt: string, i: number) => (
+                                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                                            <button onClick={() => updateQuizAt(idx, 'correctIndex', i)} style={{ width: 24, height: 24, borderRadius: '50%', flexShrink: 0, cursor: 'pointer', border: 'none', background: q.correctIndex === i ? '#2D7A4F' : '#EEEEF5', color: q.correctIndex === i ? '#fff' : '#888', fontSize: 11, fontWeight: 700 }}>{i + 1}</button>
+                                            <input type="text" value={opt} onChange={e => updateOptionAt(idx, i, e.target.value)} placeholder={`Варіант ${i + 1}`}
+                                              style={{ flex: 1, padding: '8px 12px', borderRadius: 10, fontSize: 13, outline: 'none', fontFamily: 'inherit', border: q.correctIndex === i ? '1.5px solid #2D7A4F' : '1.5px solid #EEEEF5', background: q.correctIndex === i ? '#E8F5EE' : '#fff' }} />
+                                          </div>
+                                        ))}
+                                      </div>
+                                      <div style={{ marginBottom: 12 }}>
+                                        <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 6 }}>Пояснення</label>
+                                        <textarea rows={2} value={q.explanation} onChange={e => updateQuizAt(idx, 'explanation', e.target.value)} placeholder="Чому ця відповідь правильна?"
+                                          style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1.5px solid #EEEEF5', fontSize: 13, outline: 'none', resize: 'vertical', fontFamily: 'inherit', background: '#fff', boxSizing: 'border-box' }} />
+                                      </div>
+                                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12 }}>
+                                        <div>
+                                          <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 6 }}>Вага показу</label>
+                                          <input type="number" min={0} value={q.weight} onChange={e => updateQuizAt(idx, 'weight', Math.max(0, parseInt(e.target.value) || 0))}
+                                            style={{ width: 90, padding: '8px 12px', borderRadius: 10, border: '1.5px solid #EEEEF5', fontSize: 13, outline: 'none', background: '#fff' }} />
+                                        </div>
+                                        <span style={{ fontSize: 11, color: '#888', flex: 1, lineHeight: 1.4 }}>0 — не показувати, 1 — звичайна, 2+ — частіше</span>
+                                        <button onClick={() => deleteQuizAt(idx)} style={{ padding: '8px 14px', borderRadius: 10, border: '1.5px solid #FECACA', background: '#fff', color: '#DC2626', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>🗑 Видалити</button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+
+                            <button onClick={() => addQuizForLine(line)} style={{ padding: '8px 14px', borderRadius: 10, border: `1.5px dashed ${LINE_COLOR[line as Line]}`, background: '#fff', color: LINE_COLOR[line as Line], fontSize: 12, fontWeight: 600, cursor: 'pointer', marginTop: 4 }}>
+                              + Додати питання ({LINE_LABEL[line as Line]})
+                            </button>
                           </div>
-                          <div style={{ marginBottom: 12 }}>
-                            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 6 }}>Варіанти <span style={{ fontWeight: 400, color: '#888' }}>(клікни кружечок = правильна)</span></label>
-                            {currentQuiz.options.map((opt: string, i: number) => (
-                              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                                <button onClick={() => updateQuiz(quizTab, 'correctIndex', i)} style={{ width: 24, height: 24, borderRadius: '50%', flexShrink: 0, cursor: 'pointer', border: 'none', background: currentQuiz.correctIndex === i ? '#2D7A4F' : '#EEEEF5', color: currentQuiz.correctIndex === i ? '#fff' : '#888', fontSize: 11, fontWeight: 700 }}>{i + 1}</button>
-                                <input type="text" value={opt} onChange={e => updateOption(quizTab, i, e.target.value)} placeholder={`Варіант ${i + 1}`}
-                                  style={{ flex: 1, padding: '8px 12px', borderRadius: 10, fontSize: 13, outline: 'none', fontFamily: 'inherit', border: currentQuiz.correctIndex === i ? '1.5px solid #2D7A4F' : '1.5px solid #EEEEF5', background: currentQuiz.correctIndex === i ? '#E8F5EE' : '#fff' }} />
-                              </div>
-                            ))}
-                          </div>
-                          <div>
-                            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 6 }}>Пояснення</label>
-                            <textarea rows={2} value={currentQuiz.explanation} onChange={e => updateQuiz(quizTab, 'explanation', e.target.value)} placeholder="Чому ця відповідь правильна?"
-                              style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1.5px solid #EEEEF5', fontSize: 13, outline: 'none', resize: 'vertical', fontFamily: 'inherit', background: '#fff', boxSizing: 'border-box' }} />
-                          </div>
-                        </div>
-                      )}
+                        );
+                      })}
                     </div>
                   )}
 
