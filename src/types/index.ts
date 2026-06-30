@@ -54,11 +54,14 @@ export interface Location {
 
 // ── Лінія маршруту (з MongoDB) ────────────────────────────
 export interface QuestLine {
-  key:       Line;
-  label:     string;
-  color:     string;
-  startSlug: string;
-  order:     string[];  // масив slug-ів у порядку проходження
+  key:         Line;
+  label:       string;
+  color:       string;
+  startSlug:   string;
+  order:       string[];  // масив slug-ів у порядку проходження
+  status?:     'draft' | 'live';      // дефолт live (наявні лінії)
+  theme?:      'general' | 'themed';  // дефолт general; themed → бейдж "Т"
+  description?: string;
 }
 
 // ── Сесія туриста (localStorage) ─────────────────────────

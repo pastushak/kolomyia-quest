@@ -8,14 +8,18 @@ export async function GET() {
 
     const lines = await QuestLineModel
       .find({})
-      .select('key label color startSlug order')
+      .select('key label color startSlug order status theme description')
       .lean();
 
-    // Повертаємо у фіксованому порядку: вишнева, оранжева, зелена
-    const ORDER = ['cherry', 'orange', 'green'];
-    const sorted = ORDER
+    // Базові лінії — у фіксованому порядку спершу, нові тематичні — за ними (за label).
+    const BASE = ['cherry', 'orange', 'green'];
+    const baseLines = BASE
       .map(key => lines.find((l: any) => l.key === key))
       .filter(Boolean);
+    const customLines = lines
+      .filter((l: any) => !BASE.includes(l.key))
+      .sort((a: any, b: any) => (a.label || '').localeCompare(b.label || ''));
+    const sorted = [...baseLines, ...customLines];
 
     return NextResponse.json(sorted);
   } catch (err) {
