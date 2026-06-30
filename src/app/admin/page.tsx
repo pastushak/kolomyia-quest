@@ -80,7 +80,7 @@ function QRItem({ url, label, sublabel, color }: { url: string; label: string; s
 
 // ── Головний компонент ─────────────────────────────────────
 
-type Tab = 'stats' | 'spots' | 'qr' | 'shop';
+type Tab = 'stats' | 'spots' | 'lines' | 'qr' | 'shop';
 
 export default function AdminPage() {
   const [tab, setTab] = useState<Tab>('stats');
@@ -107,10 +107,16 @@ export default function AdminPage() {
   const [shopEditing, setShopEditing] = useState<any | null>(null);
   const [shopSaving, setShopSaving]   = useState(false);
   const [shopNew, setShopNew]         = useState(false);
+  // Lines стан
+  const [linesList, setLinesList]   = useState<any[]>([]);
+  const [linesLoading, setLinesLoading] = useState(false);
+  const [lineEditing, setLineEditing] = useState<any | null>(null);
+  const [lineIsNew, setLineIsNew]     = useState(false);
+  const [lineSaving, setLineSaving]   = useState(false);
 
   const BASE_URL = typeof window !== 'undefined' ? window.location.origin : '';
 
-  useEffect(() => { ensureLinesRegistered(); loadStats(); loadSpots(); loadShop(); }, []);
+  useEffect(() => { ensureLinesRegistered(); loadStats(); loadSpots(); loadShop(); loadLines(); }, []);
 
   // ── Stats ────────────────────────────────────────────────
 
@@ -203,6 +209,56 @@ export default function AdminPage() {
     setShopLoading(false);
   }
 
+  // ── Лінії (маршрути) ──
+  async function loadLines() {
+    setLinesLoading(true);
+    const res  = await fetch('/api/admin/lines');
+    const data = await res.json();
+    setLinesList(Array.isArray(data) ? data : []);
+    setLinesLoading(false);
+  }
+
+  function openLineCreate() {
+    setLineEditing({ key: '', label: '', color: '#8a9c39', startSlug: '', status: 'draft', theme: 'general', description: '', order: [] });
+    setLineIsNew(true);
+  }
+
+  function openLineEdit(line: any) {
+    setLineEditing({
+      key: line.key, label: line.label || '', color: line.color || '#888',
+      startSlug: line.startSlug || '', status: line.status || 'live',
+      theme: line.theme || 'general', description: line.description || '',
+      order: line.order || [],
+    });
+    setLineIsNew(false);
+  }
+
+  async function handleLineSave() {
+    if (!lineEditing) return;
+    setLineSaving(true);
+    const res = await fetch('/api/admin/lines', {
+      method:  lineIsNew ? 'POST' : 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(lineEditing),
+    });
+    const data = await res.json().catch(() => ({}));
+    setLineSaving(false);
+    if (!res.ok) { alert(data.error || 'Не вдалося зберегти лінію'); return; }
+    await loadLines();
+    setLineEditing(null);
+    setLineIsNew(false);
+  }
+
+  async function handleLineDelete() {
+    if (!lineEditing || lineIsNew) return;
+    if (!confirm(`Видалити маршрут "${lineEditing.label}" (${lineEditing.key})? Дію не можна відмінити.`)) return;
+    const res = await fetch(`/api/admin/lines?key=${encodeURIComponent(lineEditing.key)}`, { method: 'DELETE' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { alert(data.error || 'Не вдалося видалити лінію'); return; }
+    await loadLines();
+    setLineEditing(null);
+  }
+
   // Порожній спот для форми створення
   function openCreate() {
     setEditing({
@@ -277,6 +333,7 @@ export default function AdminPage() {
   const TABS: { key: Tab; label: string; icon: string }[] = [
     { key: 'stats', label: 'Статистика', icon: '📊' },
     { key: 'spots', label: 'Локації',    icon: '📍' },
+    { key: 'lines', label: 'Маршрути',   icon: '🛤️' },
     { key: 'qr',    label: 'QR-коди',    icon: '📱' },
     { key: 'shop',  label: 'Магазин',    icon: '🏪' },
   ];
@@ -720,6 +777,141 @@ export default function AdminPage() {
                   {!isNewSpot && (
                     <button onClick={handleDelete} disabled={deleting} style={{ width: '100%', marginTop: 10, padding: 11, borderRadius: 12, border: '1.5px solid #FECACA', background: '#fff', color: '#DC2626', fontSize: 13, fontWeight: 600, cursor: deleting ? 'wait' : 'pointer' }}>
                       {deleting ? 'Видаляємо...' : '🗑 Видалити спот'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ── ТАБ: Маршрути (лінії) ── */}
+        {tab === 'lines' && (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div>
+                <h1 style={{ fontSize: 20, fontWeight: 800, color: '#1A1A2E', margin: 0 }}>Маршрути</h1>
+                <p style={{ fontSize: 13, color: '#888', margin: '4px 0 0' }}>{linesList.length} ліній</p>
+              </div>
+              <button onClick={openLineCreate} style={{ padding: '10px 18px', borderRadius: 12, border: 'none', background: '#89182c', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                + Новий маршрут
+              </button>
+            </div>
+
+            {linesLoading && <div style={{ textAlign: 'center', padding: 20, color: '#888' }}>Завантаження…</div>}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {linesList.map(line => {
+                const isBase = ['cherry', 'orange', 'green'].includes(line.key);
+                return (
+                  <button key={line.key} onClick={() => openLineEdit(line)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', borderRadius: 14, cursor: 'pointer', border: '1.5px solid #EEEEF5', background: '#fff', textAlign: 'left' }}>
+                    <div style={{ width: 16, height: 16, borderRadius: '50%', background: line.color, flexShrink: 0 }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: '#1A1A2E', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {line.label}
+                        {line.theme === 'themed' && <span style={{ fontSize: 10, fontWeight: 800, color: line.color, background: line.color + '20', borderRadius: 6, padding: '1px 6px' }}>Т</span>}
+                        {isBase && <span style={{ fontSize: 10, color: '#aaa' }}>базова</span>}
+                      </div>
+                      <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>
+                        {line.key} · {(line.order || []).length} точок
+                      </div>
+                    </div>
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 10, background: line.status === 'live' ? '#E8F5EE' : '#FEF3E2', color: line.status === 'live' ? '#2D7A4F' : '#D4621A' }}>
+                      {line.status === 'live' ? 'робоча' : 'чернетка'}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Модал редагування/створення лінії */}
+            {lineEditing && (
+              <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, zIndex: 50 }} onClick={() => { setLineEditing(null); setLineIsNew(false); }}>
+                <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 20, padding: 24, width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto' }}>
+                  <h2 style={{ fontSize: 18, fontWeight: 800, color: '#1A1A2E', margin: '0 0 20px' }}>{lineIsNew ? 'Новий маршрут' : lineEditing.label}</h2>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 6 }}>Ключ (key) {lineIsNew && <span style={{ color: '#DC2626' }}>*</span>}</label>
+                      <input value={lineEditing.key} disabled={!lineIsNew}
+                        onChange={e => setLineEditing({ ...lineEditing, key: e.target.value.trim().toLowerCase().replace(/\s+/g, '_') })}
+                        placeholder="напр. blue" 
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1.5px solid #EEEEF5', fontSize: 13, fontFamily: 'monospace', outline: 'none', background: lineIsNew ? '#fff' : '#F5F5F8', color: lineIsNew ? '#1A1A2E' : '#999', boxSizing: 'border-box' }} />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 6 }}>Назва {lineIsNew && <span style={{ color: '#DC2626' }}>*</span>}</label>
+                      <input value={lineEditing.label} onChange={e => setLineEditing({ ...lineEditing, label: e.target.value })}
+                        placeholder="Синя лінія"
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1.5px solid #EEEEF5', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 6 }}>Колір</label>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <input type="color" value={lineEditing.color} onChange={e => setLineEditing({ ...lineEditing, color: e.target.value })}
+                          style={{ width: 44, height: 38, borderRadius: 10, border: '1.5px solid #EEEEF5', cursor: 'pointer', padding: 2 }} />
+                        <input value={lineEditing.color} onChange={e => setLineEditing({ ...lineEditing, color: e.target.value })}
+                          style={{ flex: 1, padding: '10px 12px', borderRadius: 10, border: '1.5px solid #EEEEF5', fontSize: 13, fontFamily: 'monospace', outline: 'none', boxSizing: 'border-box' }} />
+                      </div>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 6 }}>Стартова точка (slug)</label>
+                      <input value={lineEditing.startSlug} onChange={e => setLineEditing({ ...lineEditing, startSlug: e.target.value.trim() })}
+                        placeholder="напр. train_station"
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1.5px solid #EEEEF5', fontSize: 13, fontFamily: 'monospace', outline: 'none', boxSizing: 'border-box' }} />
+                    </div>
+                  </div>
+
+                  {/* Статус + Тип */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 6 }}>Статус</label>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        {(['draft', 'live'] as const).map(st => (
+                          <button key={st} onClick={() => setLineEditing({ ...lineEditing, status: st })}
+                            style={{ flex: 1, padding: '8px', borderRadius: 10, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, background: lineEditing.status === st ? (st === 'live' ? '#2D7A4F' : '#D4621A') : '#F0F0F5', color: lineEditing.status === st ? '#fff' : '#555' }}>
+                            {st === 'live' ? 'Робоча' : 'Чернетка'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 6 }}>Тип</label>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        {(['general', 'themed'] as const).map(th => (
+                          <button key={th} onClick={() => setLineEditing({ ...lineEditing, theme: th })}
+                            style={{ flex: 1, padding: '8px', borderRadius: 10, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, background: lineEditing.theme === th ? '#1A1A2E' : '#F0F0F5', color: lineEditing.theme === th ? '#fff' : '#555' }}>
+                            {th === 'general' ? 'Загальний' : 'Тематичний'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 6 }}>Опис (для заглушки «незабаром»)</label>
+                    <textarea rows={2} value={lineEditing.description} onChange={e => setLineEditing({ ...lineEditing, description: e.target.value })}
+                      placeholder="Короткий опис маршруту…"
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1.5px solid #EEEEF5', fontSize: 13, outline: 'none', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+                  </div>
+
+                  <div style={{ fontSize: 11, color: '#aaa', marginBottom: 16, lineHeight: 1.5 }}>
+                    Порядок спотів маршруту ({(lineEditing.order || []).length} точок) керується окремо — у наступному оновленні. Поки нова лінія порожня, тримай її в статусі «чернетка».
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <button onClick={handleLineSave} disabled={lineSaving} style={{ flex: 1, padding: 12, borderRadius: 12, border: 'none', background: '#89182c', color: '#fff', fontSize: 14, fontWeight: 700, cursor: lineSaving ? 'wait' : 'pointer' }}>
+                      {lineSaving ? 'Зберігаємо…' : (lineIsNew ? 'Створити маршрут' : 'Зберегти')}
+                    </button>
+                    <button onClick={() => { setLineEditing(null); setLineIsNew(false); }} style={{ padding: '12px 20px', borderRadius: 12, border: '1.5px solid #EEEEF5', background: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', color: '#555' }}>Скасувати</button>
+                  </div>
+
+                  {!lineIsNew && !['cherry', 'orange', 'green'].includes(lineEditing.key) && (
+                    <button onClick={handleLineDelete} style={{ width: '100%', marginTop: 10, padding: 11, borderRadius: 12, border: '1.5px solid #FECACA', background: '#fff', color: '#DC2626', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                      🗑 Видалити маршрут
                     </button>
                   )}
                 </div>

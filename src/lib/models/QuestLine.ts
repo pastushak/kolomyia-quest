@@ -16,8 +16,9 @@ const QuestLineSchema = new Schema(
     // HEX колір лінії (з логотипу Коломиї)
     color: { type: String, required: true },
 
-    // Slug стартової точки
-    startSlug: { type: String, required: true },
+    // Slug стартової точки. НЕ required — нова лінія створюється порожньою
+    // (старт зʼявиться, коли наповниш маршрут спотами).
+    startSlug: { type: String, default: '' },
 
     // Статус лінії: 'live' — робоча (видно й можна проходити),
     // 'draft' — чернетка (на головній показується заглушка "незабаром").
@@ -34,9 +35,8 @@ const QuestLineSchema = new Schema(
     // Порядок slug-ів локацій на цій лінії
     // Один спот може бути в order кількох ліній — це нормально
     order: {
-      type:     [String],
-      required: true,
-      default:  [],
+      type:    [String],
+      default: [],
     },
   },
   { timestamps: true },
