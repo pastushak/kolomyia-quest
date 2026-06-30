@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { getSession, completeSpot, trackQrScan, switchLine } from '@/lib/session';
+import { getSession, completeSpot, trackQrScan, switchLine, isUnlocked } from '@/lib/session';
 import { lineColor, lineLabel, ensureLinesRegistered, getNextSlug, getQuizForLine } from '@/lib/utils';
 import { Location, Line } from '@/types';
 import HudzykMascot from '@/components/quest/HudzykMascot';
@@ -11,8 +11,9 @@ import QuizCard from '@/components/quest/QuizCard';
 import dynamic from 'next/dynamic';
 
 const QrScanner = dynamic(() => import('@/components/quest/QrScanner'), { ssr: false });
+const MapView   = dynamic(() => import('@/components/map/MapView'), { ssr: false });
 
-type Stage = 'info' | 'quiz';
+
 
 export default function SpotPage() {
   const params = useParams();
@@ -22,7 +23,9 @@ export default function SpotPage() {
   const [session, setSession]     = useState(getSession());
   const [spot, setSpot]           = useState<Location | null>(null);
   const [order, setOrder]         = useState<string[]>([]);
-  const [stage, setStage]         = useState<Stage>('info');
+  const [showQuiz, setShowQuiz]   = useState(false);   // турист перейшов до квіза (після воріт)
+  const [unlocked, setUnlocked]   = useState(false);   // ворота пройдено (скан + «Ого»)
+  const [showMap, setShowMap]     = useState(true);    // карта розгорнута/згорнута
   const [loading, setLoading]     = useState(true);
   const [showScanner, setShowScanner] = useState(false);
   const [mounted, setMounted]     = useState(false);
@@ -35,6 +38,7 @@ export default function SpotPage() {
     if (!s) { router.push('/'); return; }
     setSession(s);
     ensureLinesRegistered();   // кольори/назви всіх ліній (для пересадок на чужі лінії)
+    setUnlocked(isUnlocked(slug));   // турист міг повернутись з info-сторінки вже розблокованим
 
     // Завантажуємо спот і порядок лінії паралельно
     Promise.all([
@@ -77,8 +81,8 @@ export default function SpotPage() {
   const spotIndex   = order.indexOf(slug);
   const spotNumber  = spotIndex + 1;
   const quiz        = getQuizForLine(spot, line);
-  const hudzykMood  = stage === 'quiz' ? 'curious' : 'guide';
-  const hudzykMsg   = stage === 'quiz' ? 'Відповідай!' : `Точка ${spotNumber}!`;
+  const hudzykMood  = showQuiz ? 'curious' : 'guide';
+  const hudzykMsg   = showQuiz ? 'Відповідай!' : `Точка ${spotNumber}!`;
 
   function handleQrScan(text: string) {
     setShowScanner(false);
@@ -95,7 +99,8 @@ export default function SpotPage() {
       }
       if (scannedSlug === slug) {
         trackQrScan(slug);   // реальний скан саме цієї точки
-        setStage('quiz');
+        // Ворота: ведемо на розширену інфо, де кнопка «Ого! Так цікаво» розблокує квіз
+        router.push(`/info/${slug}`);
       } else {
         router.push(`/spot/${scannedSlug}`);
       }
@@ -178,13 +183,24 @@ export default function SpotPage() {
           <HudzykMascot mood={hudzykMood} message={hudzykMsg} size={100} />
         </div>
 
-        <div style={{ display: 'flex', background: '#EEEEF5', borderRadius: 14, padding: 4, marginBottom: 16 }}>
-          {(['info', 'quiz'] as Stage[]).map(s => (
-            <button key={s} onClick={() => setStage(s)} style={{ flex: 1, padding: '10px 0', borderRadius: 10, border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 700, background: stage === s ? '#fff' : 'transparent', color: stage === s ? '#1A1A2E' : '#8888A8' }}>
-              {s === 'info' ? 'Про місце' : 'Квіз'}
+        {/* ── Карта (перший блок, згортається) ── */}
+        {spot.lat && spot.lng && (
+          <div style={{ marginBottom: 16 }}>
+            <button
+              onClick={() => setShowMap(m => !m)}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 12, border: '1.5px solid #EEEEF5', background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 700, color: '#1A1A2E' }}
+            >
+              <span>🗺️</span>
+              <span style={{ flex: 1, textAlign: 'left' }}>Карта · точка {spotNumber} з {order.length}</span>
+              <span style={{ fontSize: 11, color: '#888' }}>{showMap ? 'сховати ▲' : 'показати ▼'}</span>
             </button>
-          ))}
-        </div>
+            {showMap && (
+              <div style={{ marginTop: 8, borderRadius: 16, overflow: 'hidden', border: '1px solid #EEEEF5', height: 260 }}>
+                <MapView line={line} locations={[spot]} completedSlugs={session.completedSlugs} activeSlug={slug} />
+              </div>
+            )}
+          </div>
+        )}
 
         {showScanner && (
           <div style={{ marginBottom: 16 }}>
@@ -192,19 +208,44 @@ export default function SpotPage() {
           </div>
         )}
 
-        {stage === 'info' ? (
-          <LocationCard
-            name={spot.name}
-            address={spot.address}
-            info={spot.info}
-            audioUrl={spot.audioUrl}
-            qrHint={spot.qrHint}
-            spotNumber={spotNumber}
-            totalSpots={order.length}
-            lineColor={color}
-            onReady={() => setStage('quiz')}
-            onScan={() => setShowScanner(true)}
-          />
+        {!showQuiz ? (
+          <>
+            {/* Інформація про локацію */}
+            <LocationCard
+              name={spot.name}
+              address={spot.address}
+              info={spot.info}
+              audioUrl={spot.audioUrl}
+              qrHint={spot.qrHint}
+              spotNumber={spotNumber}
+              totalSpots={order.length}
+              lineColor={color}
+            />
+
+            {/* ── Ворота: скан QR + перехід до квіза ── */}
+            <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <button
+                onClick={() => setShowScanner(true)}
+                style={{ width: '100%', padding: 16, borderRadius: 16, border: 'none', background: color, color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer' }}
+              >
+                {unlocked ? 'Повторно сканувати QR-код' : 'Я на місці — сканую QR-код'}
+              </button>
+
+              <button
+                onClick={() => setShowQuiz(true)}
+                disabled={!unlocked}
+                style={{ width: '100%', padding: 16, borderRadius: 16, border: 'none', background: unlocked ? '#2D7A4F' : '#E8E8EF', color: unlocked ? '#fff' : '#AAAAB8', fontSize: 16, fontWeight: 700, cursor: unlocked ? 'pointer' : 'not-allowed' }}
+              >
+                А тепер до квізу! →
+              </button>
+
+              {!unlocked && (
+                <p style={{ fontSize: 12, color: '#8888A8', textAlign: 'center', margin: '2px 0 0', lineHeight: 1.5 }}>
+                  Спочатку проскануй QR-код локації та ознайомся з інформацією про місце.
+                </p>
+              )}
+            </div>
+          </>
         ) : (
           quiz ? (
             <QuizCard

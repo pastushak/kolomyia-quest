@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { trackQrScan } from '@/lib/session';
+import { trackQrScan, markUnlocked, getSession } from '@/lib/session';
 import { lineColor, lineLabel } from '@/lib/utils';
 
 interface SpotInfo {
@@ -20,9 +20,20 @@ interface SpotInfo {
 
 export default function InfoPage() {
   const { slug } = useParams() as { slug: string };
+  const router = useRouter();
   const [spot, setSpot]       = useState<SpotInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+
+  // Чи турист у процесі квеста (є активна сесія) — тоді показуємо ворота «Ого».
+  const [inQuest, setInQuest] = useState(false);
+  useEffect(() => { setInQuest(!!getSession()); }, []);
+
+  // Підтвердження ознайомлення → розблокування квіза на споті → назад на спот
+  function handleAcknowledge() {
+    markUnlocked(slug);
+    router.push(`/spot/${slug}`);
+  }
 
   useEffect(() => {
     fetch(`/api/spots/${slug}`)
@@ -133,6 +144,16 @@ export default function InfoPage() {
           </a>
         </div>
 
+        {/* ── Ворота квеста: підтвердження ознайомлення ── */}
+        {inQuest && (
+          <button
+            onClick={handleAcknowledge}
+            style={{ width: '100%', padding: 18, borderRadius: 18, border: 'none', background: mainColor, color: '#fff', fontSize: 17, fontWeight: 800, cursor: 'pointer', marginBottom: 20, boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}
+          >
+            Ого! Так цікаво — до квізу →
+          </button>
+        )}
+
         {/* Атрибуція */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', background: '#fff', borderRadius: 16, border: '1px solid #f0ece6' }}>
           <Image src="/hudzyk.png" alt="Ґудзик" width={40} height={40} style={{ objectFit: 'contain', flexShrink: 0 }} />
@@ -140,12 +161,14 @@ export default function InfoPage() {
             <div style={{ fontSize: 13, fontWeight: 700, color: '#1a1a2e' }}>Коломия-Квест</div>
             <div style={{ fontSize: 11, color: '#888' }}>Інтерактивна квест-карта міста Коломиї</div>
           </div>
-          <a
-            href={`/spot/${slug}`}
-            style={{ marginLeft: 'auto', padding: '7px 14px', borderRadius: 20, border: '1.5px solid #f5e0e3', background: '#fff', color: '#89182c', fontSize: 12, fontWeight: 700, textDecoration: 'none', flexShrink: 0 }}
-          >
-            До квесту →
-          </a>
+          {!inQuest && (
+            <a
+              href={`/spot/${slug}`}
+              style={{ marginLeft: 'auto', padding: '7px 14px', borderRadius: 20, border: '1.5px solid #f5e0e3', background: '#fff', color: '#89182c', fontSize: 12, fontWeight: 700, textDecoration: 'none', flexShrink: 0 }}
+            >
+              До квесту →
+            </a>
+          )}
         </div>
 
       </div>

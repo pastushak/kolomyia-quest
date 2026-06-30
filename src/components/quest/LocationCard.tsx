@@ -11,11 +11,11 @@ interface Props {
   spotNumber:  number;
   totalSpots:  number;
   lineColor:   string;
-  onReady:     () => void;
-  onScan:      () => void;
+  onReady?:    () => void;
+  onScan?:     () => void;
 }
 
-export default function LocationCard({ name, address, info, audioUrl, qrHint, spotNumber, totalSpots, lineColor, onReady, onScan }: Props) {
+export default function LocationCard({ name, address, info, audioUrl, qrHint, spotNumber, totalSpots, lineColor }: Props) {
   const audioRef  = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying]   = useState(false);
   const [progress, setProgress] = useState(0);
@@ -167,21 +167,6 @@ export default function LocationCard({ name, address, info, audioUrl, qrHint, sp
           <div style={{ fontSize: 13, color: '#633806', lineHeight: 1.5 }}>{qrHint}</div>
         </div>
       </div>
-
-      {/* Кнопки */}
-      <button
-        onClick={onReady}
-        style={{ width: '100%', padding: 16, borderRadius: 16, border: 'none', background: lineColor, color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer', marginBottom: 10 }}
-      >
-        Я на місці — починаю квіз →
-      </button>
-
-      <button
-        onClick={onScan}
-        style={{ width: '100%', padding: 13, borderRadius: 16, cursor: 'pointer', border: `1.5px solid ${lineColor}`, background: 'transparent', color: lineColor, fontSize: 14, fontWeight: 600 }}
-      >
-        Сканувати QR-код
-      </button>
 
     </div>
   );

@@ -2,6 +2,7 @@ import { Session, Line, AgeGroup } from '@/types';
 
 const KEY     = 'kq_session';
 const SID_KEY = 'kq_sid';
+const UNLOCK_KEY = 'kq_unlocked';   // слаги, де ворота пройдено (скан QR + «Ого»)
 
 // ── Читання / запис ───────────────────────────────────────
 export function getSession(): Session | null {
@@ -20,6 +21,31 @@ export function getDbSessionId(): string | null {
 export function clearSession(): void {
   localStorage.removeItem(KEY);
   localStorage.removeItem(SID_KEY);
+  localStorage.removeItem(UNLOCK_KEY);
+}
+
+// ── Ворота локації (скан QR + підтвердження «Ого! Так цікаво») ──
+// Тимчасовий клієнтський стан: який спот турист «розблокував» скануванням.
+// Окремо від сесії та серверного completedSlugs (то — справжній прогрес).
+export function getUnlockedSlugs(): string[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(UNLOCK_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+export function isUnlocked(slug: string): boolean {
+  return getUnlockedSlugs().includes(slug);
+}
+
+export function markUnlocked(slug: string): void {
+  if (typeof window === 'undefined') return;
+  const list = getUnlockedSlugs();
+  if (!list.includes(slug)) {
+    list.push(slug);
+    localStorage.setItem(UNLOCK_KEY, JSON.stringify(list));
+  }
 }
 
 // ── Трекінг ───────────────────────────────────────────────
