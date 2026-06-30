@@ -32,6 +32,8 @@ interface SpotData {
   _id:       string;
   slug:      string;
   name:      string;
+  lat?:      number;
+  lng?:      number;
   address:   string;
   info:      string;
   audioUrl:  string;
@@ -92,6 +94,8 @@ export default function AdminPage() {
   const [spots, setSpots]         = useState<SpotData[]>([]);
   const [spotsLoading, setSpotsLoading] = useState(true);
   const [editing, setEditing]     = useState<SpotData | null>(null);
+  const [isNewSpot, setIsNewSpot] = useState(false);   // true = режим створення (modal та сама)
+  const [deleting, setDeleting]   = useState(false);
   const [saving, setSaving]       = useState(false);
   const [saved, setSaved]         = useState(false);
   const [filter, setFilter]       = useState<string>('all');
@@ -154,6 +158,7 @@ export default function AdminPage() {
       weight:       typeof q.weight === 'number' ? q.weight : 1,
     }));
     setEditing({ ...spot, quizzes });
+    setIsNewSpot(false);
     setExpandedQuiz(null);
   }
 
@@ -198,18 +203,62 @@ export default function AdminPage() {
     setShopLoading(false);
   }
 
+  // Порожній спот для форми створення
+  function openCreate() {
+    setEditing({
+      _id: '', slug: '', name: '', address: '', info: '', audioUrl: '',
+      fullInfo: '', qrHint: '', type: 'regular', lines: [], transfers: [], quizzes: [],
+    });
+    setIsNewSpot(true);
+    setExpandedQuiz(null);
+  }
+
+  async function handleDelete() {
+    if (!editing || isNewSpot) return;
+    if (!confirm(`Видалити спот "${editing.name}" (${editing.slug})? Дію не можна відмінити.`)) return;
+    setDeleting(true);
+    const res = await fetch(`/api/admin/spots?slug=${encodeURIComponent(editing.slug)}`, { method: 'DELETE' });
+    const data = await res.json().catch(() => ({}));
+    setDeleting(false);
+    if (!res.ok) {
+      alert(data.error || 'Не вдалося видалити спот');
+      return;
+    }
+    await loadSpots();
+    setEditing(null);
+    setIsNewSpot(false);
+  }
+
   async function handleSave() {
     if (!editing) return;
     setSaving(true);
     // Зберігаємо ВСІ заповнені питання (не по одному на лінію).
     const filledQuizzes = (editing.quizzes || []).filter(isQuizFilled);
-    await fetch('/api/admin/spots', {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slug: editing.slug, info: editing.info, fullInfo: editing.fullInfo, audioUrl: editing.audioUrl, qrHint: editing.qrHint, address: editing.address, quizzes: filledQuizzes.length > 0 ? filledQuizzes : null }),
+    const payload = {
+      slug: editing.slug, name: editing.name, lat: editing.lat, lng: editing.lng,
+      type: editing.type, lines: editing.lines, transfers: editing.transfers,
+      info: editing.info, fullInfo: editing.fullInfo, audioUrl: editing.audioUrl,
+      qrHint: editing.qrHint, address: editing.address,
+      quizzes: filledQuizzes.length > 0 ? filledQuizzes : null,
+    };
+
+    const res = await fetch('/api/admin/spots', {
+      method:  isNewSpot ? 'POST' : 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(payload),
     });
-    setSaving(false); setSaved(true);
+    const data = await res.json().catch(() => ({}));
+    setSaving(false);
+
+    if (!res.ok) {
+      alert(data.error || 'Не вдалося зберегти спот');
+      return;
+    }
+    setSaved(true);
     setTimeout(() => setSaved(false), 2000);
-    await loadSpots(); setEditing(null);
+    await loadSpots();
+    setEditing(null);
+    setIsNewSpot(false);
   }
 
   async function handleLogout() {
@@ -426,6 +475,9 @@ export default function AdminPage() {
                 <h1 style={{ fontSize: 20, fontWeight: 800, color: '#1A1A2E', margin: 0 }}>Локації</h1>
                 <p style={{ fontSize: 13, color: '#888', margin: '4px 0 0' }}>{spots.length} спотів у базі даних</p>
               </div>
+              <button onClick={openCreate} style={{ padding: '10px 18px', borderRadius: 12, border: 'none', background: '#89182c', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                + Новий спот
+              </button>
             </div>
 
             <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
@@ -480,12 +532,86 @@ export default function AdminPage() {
               <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
                 <div style={{ background: '#fff', borderRadius: 20, padding: 28, width: '100%', maxWidth: 600, maxHeight: '90vh', overflowY: 'auto' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-                    <h2 style={{ fontSize: 18, fontWeight: 800, color: '#1A1A2E', margin: 0 }}>{editing.name}</h2>
+                    <h2 style={{ fontSize: 18, fontWeight: 800, color: '#1A1A2E', margin: 0 }}>{isNewSpot ? 'Новий спот' : (editing.name || 'Редагування')}</h2>
                     <button onClick={() => setEditing(null)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#888' }}>✕</button>
                   </div>
 
+                  {/* ── Базові поля спота ── */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 6 }}>Slug (ID) {isNewSpot && <span style={{ color: '#DC2626' }}>*</span>}</label>
+                      <input value={editing.slug} disabled={!isNewSpot}
+                        onChange={e => setEditing({ ...editing, slug: e.target.value.trim().toLowerCase().replace(/\s+/g, '_') })}
+                        placeholder="напр. ozero_rufa"
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1.5px solid #EEEEF5', fontSize: 13, outline: 'none', fontFamily: 'monospace', background: isNewSpot ? '#fff' : '#F5F5F8', color: isNewSpot ? '#1A1A2E' : '#999', boxSizing: 'border-box' }} />
+                      {!isNewSpot && <span style={{ fontSize: 10, color: '#aaa' }}>slug не можна змінити після створення</span>}
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 6 }}>Назва {isNewSpot && <span style={{ color: '#DC2626' }}>*</span>}</label>
+                      <input value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })}
+                        placeholder="Озеро Руфа"
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1.5px solid #EEEEF5', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 6 }}>Широта (lat) {isNewSpot && <span style={{ color: '#DC2626' }}>*</span>}</label>
+                      <input type="number" step="any" value={editing.lat ?? ''} onChange={e => setEditing({ ...editing, lat: e.target.value === '' ? undefined : parseFloat(e.target.value) })}
+                        placeholder="48.5295"
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1.5px solid #EEEEF5', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 6 }}>Довгота (lng) {isNewSpot && <span style={{ color: '#DC2626' }}>*</span>}</label>
+                      <input type="number" step="any" value={editing.lng ?? ''} onChange={e => setEditing({ ...editing, lng: e.target.value === '' ? undefined : parseFloat(e.target.value) })}
+                        placeholder="25.0387"
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1.5px solid #EEEEF5', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+                    </div>
+                  </div>
+
+                  {/* Тип спота */}
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 6 }}>Тип</label>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {(['start', 'regular', 'shared', 'finish'] as const).map(t => (
+                        <button key={t} onClick={() => setEditing({ ...editing, type: t })}
+                          style={{ padding: '7px 14px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, background: editing.type === t ? '#1A1A2E' : '#F0F0F5', color: editing.type === t ? '#fff' : '#555' }}>
+                          {t}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Лінії та пересадки */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 6 }}>Лінії (належність)</label>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {(['cherry', 'orange', 'green'] as const).map(l => {
+                          const on = editing.lines.includes(l);
+                          return (
+                            <button key={l} onClick={() => setEditing({ ...editing, lines: on ? editing.lines.filter(x => x !== l) : [...editing.lines, l] })}
+                              style={{ padding: '6px 12px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, background: on ? LINE_COLOR[l] : LINE_COLOR[l] + '20', color: on ? '#fff' : LINE_COLOR[l] }}>
+                              {LINE_LABEL[l]} {on ? '✓' : ''}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 6 }}>Пересадки на лінії</label>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {(['cherry', 'orange', 'green'] as const).map(l => {
+                          const on = editing.transfers.includes(l);
+                          return (
+                            <button key={l} onClick={() => setEditing({ ...editing, transfers: on ? editing.transfers.filter(x => x !== l) : [...editing.transfers, l] })}
+                              style={{ padding: '6px 12px', borderRadius: 20, border: `1.5px ${on ? 'solid' : 'dashed'} ${LINE_COLOR[l]}`, cursor: 'pointer', fontSize: 12, fontWeight: 600, background: on ? LINE_COLOR[l] + '15' : '#fff', color: LINE_COLOR[l] }}>
+                              {LINE_LABEL[l]} {on ? '✓' : ''}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
                   {[
-                    { label: 'Адреса',      key: 'address', rows: 1 },
                     { label: 'Коротке прев\'ю (7-8 речень)', key: 'info',     rows: 4 },
                     { label: 'Розширена інформація (для /info/[slug])', key: 'fullInfo', rows: 10 },
                     { label: 'Аудіо URL (Dropbox ?raw=1)', key: 'audioUrl', rows: 1 },
@@ -586,10 +712,16 @@ export default function AdminPage() {
 
                   <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
                     <button onClick={handleSave} disabled={saving} style={{ flex: 1, padding: 12, borderRadius: 12, border: 'none', background: saved ? '#2D7A4F' : '#89182c', color: '#fff', fontSize: 14, fontWeight: 700, cursor: saving ? 'wait' : 'pointer' }}>
-                      {saving ? 'Зберігаємо...' : saved ? '✓ Збережено!' : 'Зберегти'}
+                      {saving ? 'Зберігаємо...' : saved ? '✓ Збережено!' : (isNewSpot ? 'Створити спот' : 'Зберегти')}
                     </button>
-                    <button onClick={() => setEditing(null)} style={{ padding: '12px 20px', borderRadius: 12, border: '1.5px solid #EEEEF5', background: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', color: '#555' }}>Скасувати</button>
+                    <button onClick={() => { setEditing(null); setIsNewSpot(false); }} style={{ padding: '12px 20px', borderRadius: 12, border: '1.5px solid #EEEEF5', background: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', color: '#555' }}>Скасувати</button>
                   </div>
+
+                  {!isNewSpot && (
+                    <button onClick={handleDelete} disabled={deleting} style={{ width: '100%', marginTop: 10, padding: 11, borderRadius: 12, border: '1.5px solid #FECACA', background: '#fff', color: '#DC2626', fontSize: 13, fontWeight: 600, cursor: deleting ? 'wait' : 'pointer' }}>
+                      {deleting ? 'Видаляємо...' : '🗑 Видалити спот'}
+                    </button>
+                  )}
                 </div>
               </div>
             )}
