@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { QuizQuestion } from '@/types';
-import { getDbSessionId } from '@/lib/session';
+import { getDbSessionId, completeSpot } from '@/lib/session';
 
 interface Props {
   questions:  QuizQuestion[];   // correctIndex тут НЕ використовується (його нема з API)
@@ -16,6 +17,7 @@ interface Props {
 const MAX_ATTEMPTS = 3;
 
 export default function QuizCard({ questions, qid, slug, line, lineColor, onComplete }: Props) {
+  const router = useRouter();
   const [current, setCurrent]     = useState(0);
   const [selected, setSelected]   = useState<number | null>(null);   // обраний варіант (ще не підтверджений)
   const [attempt, setAttempt]     = useState(1);
@@ -52,6 +54,15 @@ export default function QuizCard({ questions, qid, slug, line, lineColor, onComp
         body: JSON.stringify({ slug, line, qid, answerIndex: selected, sessionId: getDbSessionId() }),
       });
       const data = await res.json();
+
+      // Спот уже зарахований раніше (409) — не показуємо як «неправильно»,
+      // а одразу завершуємо квіз (турист міг повернутись на пройдену точку).
+      if (res.status === 409) {
+        setAllDone(true);
+        setChecking(false);
+        return;
+      }
+
       setResult(data);
       // Лічильник спроб веде сервер — синхронізуємо відображення.
       if (typeof data.attemptNumber === 'number') setAttempt(data.attemptNumber);
@@ -87,9 +98,30 @@ export default function QuizCard({ questions, qid, slug, line, lineColor, onComp
         <div style={{ fontSize: 52, marginBottom: 12 }}>🎉</div>
         <div style={{ fontSize: 20, fontWeight: 800, color: '#1A1A2E', marginBottom: 6 }}>Чудово!</div>
         <div style={{ fontSize: 14, color: '#8888A8', marginBottom: 20 }}>Усі питання пройдено</div>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#FEF7E6', border: '1px solid #F5D78A', borderRadius: 20, padding: '8px 18px', marginBottom: 24, fontSize: 15, fontWeight: 700, color: '#8B6914' }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#FEF7E6', border: '1px solid #F5D78A', borderRadius: 20, padding: '8px 18px', marginBottom: 20, fontSize: 15, fontWeight: 700, color: '#8B6914' }}>
           Баланс: {sessionXp ?? '—'} XP
         </div>
+
+        {/* Інформування про шоп — можна обміняти XP */}
+        {(sessionXp ?? 0) > 0 && (
+          <div style={{ marginBottom: 20, padding: '12px 14px', background: '#F6F4FF', borderRadius: 14, border: '1px solid #E5E0F5' }}>
+            <div style={{ fontSize: 13, color: '#5A4B9E', lineHeight: 1.5, marginBottom: 10 }}>
+              🎁 У тебе вже {sessionXp} XP — їх можна обміняти на знижки та привілеї в партнерів!
+            </div>
+            <button
+              onClick={async () => {
+                // Зараховуємо спот у localStorage ПЕРЕД переходом (сервер уже зарахував),
+                // щоб після повернення session restoration не кинула на цю ж локацію.
+                await completeSpot(slug, sessionXp ?? 0);
+                router.push('/shop');
+              }}
+              style={{ width: '100%', padding: 11, borderRadius: 12, border: '1.5px solid #C9BFF0', background: '#fff', color: '#5A4B9E', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+            >
+              🏪 Заглянути в шоп
+            </button>
+          </div>
+        )}
+
         <button
           onClick={() => onComplete(sessionXp ?? 0)}
           style={{ display: 'block', width: '100%', padding: 16, borderRadius: 16, border: 'none', background: lineColor, color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer' }}

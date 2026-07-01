@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession, signIn } from 'next-auth/react';
+import { getSession } from '@/lib/session';
 
 interface ShopItem {
   _id:          string;
@@ -67,6 +68,9 @@ export default function ShopPage() {
   const [filter, setFilter]     = useState('all');
   const [activating, setActivating] = useState<string | null>(null);
   const [modal, setModal]       = useState<{ code: string; itemName: string } | null>(null);
+  const [questLine, setQuestLine] = useState<string | null>(null);   // активна лінія квеста (localStorage)
+
+  useEffect(() => { const s = getSession(); setQuestLine(s?.line ?? null); }, []);
 
   useEffect(() => { loadShop(); }, [status]);
 
@@ -120,8 +124,8 @@ export default function ShopPage() {
       <div style={{ background: 'linear-gradient(160deg, #89182c 0%, #5a0f1d 100%)', position: 'relative', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', top: -40, right: -40, width: 200, height: 200, borderRadius: '50%', background: 'rgba(255,255,255,0.04)' }} />
         <div style={{ maxWidth: 480, margin: '0 auto', padding: '20px 24px 28px' }}>
-          <button onClick={() => router.push('/')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: 600, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 4, padding: 0 }}>
-            ← Назад
+          <button onClick={() => router.push(questLine ? `/start/${questLine}` : '/')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: 600, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 4, padding: 0 }}>
+            ← {questLine ? 'Повернутися до квесту' : 'Назад'}
           </button>
           <div style={{ fontSize: 24, fontWeight: 800, color: '#fff', marginBottom: 4 }}>🏪 Привілеї мандрівника</div>
           <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>Знижки та переваги для туристів Коломиї</div>
