@@ -12,11 +12,12 @@ interface Props {
   line:       string;
   lineColor:  string;
   onComplete: (sessionXp: number) => void;   // повертає серверний баланс сесії
+  isSharedSpot?: boolean;   // shared-спот: пропустити екран «Чудово», спот покаже блок пересадки
 }
 
 const MAX_ATTEMPTS = 3;
 
-export default function QuizCard({ questions, qid, slug, line, lineColor, onComplete }: Props) {
+export default function QuizCard({ questions, qid, slug, line, lineColor, onComplete, isSharedSpot }: Props) {
   const router = useRouter();
   const [current, setCurrent]     = useState(0);
   const [selected, setSelected]   = useState<number | null>(null);   // обраний варіант (ще не підтверджений)
@@ -58,7 +59,7 @@ export default function QuizCard({ questions, qid, slug, line, lineColor, onComp
       // Спот уже зарахований раніше (409) — не показуємо як «неправильно»,
       // а одразу завершуємо квіз (турист міг повернутись на пройдену точку).
       if (res.status === 409) {
-        setAllDone(true);
+        finishQuiz(typeof data.sessionXp === 'number' ? data.sessionXp : (sessionXp ?? 0));
         setChecking(false);
         return;
       }
@@ -81,6 +82,16 @@ export default function QuizCard({ questions, qid, slug, line, lineColor, onComp
     setResult(null);
   }
 
+  // Завершення квіза: на shared-споті пропускаємо екран «Чудово» (спот покаже
+  // блок пересадки), на звичайному — показуємо фінальний екран з кнопкою далі.
+  function finishQuiz(finalXp: number) {
+    if (isSharedSpot) {
+      onComplete(finalXp);
+    } else {
+      setAllDone(true);
+    }
+  }
+
   function handleNext() {
     if (current + 1 < questions.length) {
       setCurrent(c => c + 1);
@@ -88,7 +99,7 @@ export default function QuizCard({ questions, qid, slug, line, lineColor, onComp
       setAttempt(1);
       setResult(null);
     } else {
-      setAllDone(true);
+      finishQuiz(sessionXp ?? 0);
     }
   }
 

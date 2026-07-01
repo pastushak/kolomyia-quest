@@ -225,7 +225,7 @@ export default function SpotPage() {
           </div>
         )}
 
-        {!showQuiz ? (
+        {quizDone ? null : !showQuiz ? (
           <>
             {/* Інформація про локацію */}
             <LocationCard
@@ -276,6 +276,7 @@ export default function SpotPage() {
               slug={slug}
               line={line}
               lineColor={color}
+              isSharedSpot={(spot.transfers ?? []).some(t => t !== line)}
               onComplete={handleQuizComplete}
             />
           ) : (
@@ -305,6 +306,16 @@ export default function SpotPage() {
             <div style={{ fontSize: 13, color: '#8888A8', marginBottom: 16, lineHeight: 1.5 }}>
               Ти на перехресті ліній. Можеш продовжити цією лінією або пересісти на іншу.
             </div>
+
+            {/* Шоп-підказка (XP можна обміняти) */}
+            {session.xp > 0 && (
+              <button
+                onClick={async () => { await completeSpot(slug, session.xp); router.push('/shop'); }}
+                style={{ width: '100%', padding: '10px 12px', marginBottom: 12, borderRadius: 12, border: '1.5px solid #C9BFF0', background: '#F6F4FF', color: '#5A4B9E', fontSize: 12, fontWeight: 700, cursor: 'pointer', textAlign: 'center' }}
+              >
+                🏪 {session.xp} XP — заглянути в шоп
+              </button>
+            )}
 
             {/* Продовжити поточною лінією */}
             <button
