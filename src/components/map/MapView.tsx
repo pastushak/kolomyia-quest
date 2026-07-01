@@ -16,9 +16,10 @@ interface Props {
   locations:      Location[];
   completedSlugs: string[];
   activeSlug?:    string;
+  userPos?:       [number, number] | null;   // GPS-позиція туриста («ви тут»)
 }
 
-export default function MapView({ line, locations, completedSlugs, activeSlug }: Props) {
+export default function MapView({ line, locations, completedSlugs, activeSlug, userPos }: Props) {
   const [routePoints, setRoutePoints] = useState<[number, number][]>([]);
   const [routeLoading, setRouteLoading] = useState(true);
 
@@ -138,6 +139,19 @@ export default function MapView({ line, locations, completedSlugs, activeSlug }:
           </CircleMarker>
         );
       })}
+
+      {/* GPS-позиція туриста («ви тут») — синій маркер */}
+      {userPos && (
+        <CircleMarker
+          center={userPos}
+          radius={9}
+          pathOptions={{ fillColor: '#2563EB', fillOpacity: 1, color: '#fff', weight: 3 }}
+        >
+          <Tooltip direction="top" offset={[0, -12]} opacity={1}>
+            <span style={{ fontSize: 12, fontWeight: 600 }}>Ви тут</span>
+          </Tooltip>
+        </CircleMarker>
+      )}
     </MapContainer>
   );
 }

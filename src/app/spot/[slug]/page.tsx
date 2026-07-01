@@ -31,6 +31,8 @@ export default function SpotPage() {
   const [mounted, setMounted]     = useState(false);
   const [quizDone, setQuizDone]   = useState(false);   // квіз пройдено — показуємо вибір далі/пересадка
   const [switching, setSwitching] = useState(false);   // йде процес пересадки
+  const [nextSpot, setNextSpot]   = useState<Location | null>(null);   // наступна точка (для карти)
+  const [userPos, setUserPos]     = useState<[number, number] | null>(null);   // GPS «ви тут»
 
   useEffect(() => {
     setMounted(true);
@@ -49,6 +51,10 @@ export default function SpotPage() {
       setOrder(lineData.order);
       setLoading(false);
 
+      // Довантажуємо наступну точку (для карти «куди йти»)
+      const nx = getNextSlug(lineData.order, slug);
+      if (nx) fetch(`/api/spots/${nx}`).then(r => r.json()).then(setNextSpot).catch(() => {});
+
       // Якщо вже пройдено — переходимо далі
       if (s.completedSlugs.includes(slug)) {
         const next = getNextSlug(lineData.order, slug);
@@ -57,6 +63,17 @@ export default function SpotPage() {
       }
     }).catch(() => setLoading(false));
   }, [slug]);
+
+  // ── GPS «ви тут» — спостерігаємо за позицією туриста ──
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) return;
+    const id = navigator.geolocation.watchPosition(
+      pos => setUserPos([pos.coords.latitude, pos.coords.longitude]),
+      ()  => setUserPos(null),   // відмова/помилка — просто без крапки, карта працює
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 10000 },
+    );
+    return () => navigator.geolocation.clearWatch(id);
+  }, []);
 
   if (!mounted || !session) return null;
 
@@ -196,7 +213,7 @@ export default function SpotPage() {
             </button>
             {showMap && (
               <div style={{ marginTop: 8, borderRadius: 16, overflow: 'hidden', border: '1px solid #EEEEF5', height: 260 }}>
-                <MapView line={line} locations={[spot]} completedSlugs={session.completedSlugs} activeSlug={slug} />
+                <MapView line={line} locations={nextSpot ? [spot, nextSpot] : [spot]} completedSlugs={session.completedSlugs} activeSlug={slug} userPos={userPos} />
               </div>
             )}
           </div>
