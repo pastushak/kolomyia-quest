@@ -78,7 +78,14 @@ export default function StartPage() {
     </div>
   );
 
-  const nextSlug = order.find(slug => !completedSlugs.includes(slug)) ?? order[0];
+  // Наступна точка = спот одразу ПІСЛЯ найдальшої пройденої точки цієї лінії.
+  // Це коректно і для звичайного проходження, і для пересадки (турист входить
+  // у лінію з середини — зі спільної точки, а не з початку).
+  let furthestIdx = -1;
+  order.forEach((slug, i) => {
+    if (completedSlugs.includes(slug) && i > furthestIdx) furthestIdx = i;
+  });
+  const nextSlug = order[furthestIdx + 1] ?? order.find(slug => !completedSlugs.includes(slug)) ?? order[0];
 
   return (
     <main style={{ minHeight: '100vh', background: '#F7F7FC', paddingBottom: 32 }}>
