@@ -46,9 +46,25 @@ export default function FinishPage() {
   const line      = session.line;
   const color     = lineColor(line);
   const label     = lineLabel(line);
-  const completed = session.completedSlugs.length;
-  const total     = lineSpots.length;
   const xp        = session.xp;
+
+  // ── Чесний підрахунок точок (Концепція А) ──
+  const branches      = session.branches ?? [];
+  const isCombined    = (session.transferCount ?? 0) > 0 && branches.length > 1;
+
+  // Унікальні пройдені точки (для комбінованого — по всіх гілках, без подвійного рахунку спільних точок).
+  const uniqueDone = new Set<string>();
+  if (isCombined) {
+    branches.forEach(b => b.completedSlugs.forEach(s => uniqueDone.add(s)));
+  } else {
+    // Чистий прохід: рахуємо точки саме цієї лінії
+    session.completedSlugs
+      .filter(s => lineSpots.some(ls => ls.slug === s))
+      .forEach(s => uniqueDone.add(s));
+  }
+  const completed = uniqueDone.size;
+  const total     = lineSpots.length;   // знаменник лише для чистого проходу
+
   const startedAt  = new Date(session.startedAt);
   const finishedAt = new Date();
   const minutes    = Math.round((finishedAt.getTime() - startedAt.getTime()) / 60000);
@@ -130,7 +146,7 @@ export default function FinishPage() {
         {/* Головна картка */}
         <div style={{ background: '#fff', borderRadius: 24, border: '1px solid #EEEEF5', padding: '28px 24px', textAlign: 'center' }}>
           <div style={{ fontSize: 13, fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
-            {label} — пройдено!
+            {isCombined ? 'Комбінований маршрут — пройдено!' : `${label} — пройдено!`}
           </div>
           <h1 style={{ fontSize: 28, fontWeight: 900, color: '#1A1A2E', margin: '0 0 6px', lineHeight: 1.2 }}>
             Ти дослідив<br />Коломию!
@@ -143,7 +159,7 @@ export default function FinishPage() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
             {[
               { value: `${xp}`, label: 'XP зароблено' },
-              { value: `${completed}/${total}`, label: 'Точок пройдено' },
+              { value: isCombined ? `${completed}` : `${completed}/${total}`, label: 'Точок пройдено' },
               { value: minutes > 0 ? `${minutes}хв` : '<1хв', label: 'Час маршруту' },
             ].map(stat => (
               <div key={stat.label} style={{ background: '#F7F7FC', borderRadius: 14, padding: '14px 8px' }}>
@@ -161,30 +177,46 @@ export default function FinishPage() {
           </div>
           <div>
             <div style={{ fontSize: 15, fontWeight: 800, color: '#1A1A2E', marginBottom: 3 }}>Дослідник Коломиї</div>
-            <div style={{ fontSize: 12, color: '#8888A8', lineHeight: 1.4 }}>Цифровий бейдж · {label}</div>
+            <div style={{ fontSize: 12, color: '#8888A8', lineHeight: 1.4 }}>Цифровий бейдж · {isCombined ? 'Комбінований маршрут' : label}</div>
           </div>
           <div style={{ marginLeft: 'auto', fontSize: 22, color }}>✓</div>
         </div>
 
-        {/* Пройдені локації */}
-        <div style={{ background: '#fff', borderRadius: 20, border: '1px solid #EEEEF5', overflow: 'hidden' }}>
-          <div style={{ padding: '14px 18px', borderBottom: '1px solid #EEEEF5', fontSize: 13, fontWeight: 700, color: '#8888A8' }}>
-            Маршрут пройдено
-          </div>
-          {lineSpots.map((loc, i) => {
-            const done = session.completedSlugs.includes(loc.slug);
-            return (
-              <div key={loc.slug} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 18px', borderBottom: i < lineSpots.length - 1 ? '1px solid #EEEEF5' : 'none' }}>
-                <div style={{ width: 24, height: 24, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: done ? '#fff' : '#8888A8', background: done ? color : '#EEEEF5' }}>
-                  {done ? '✓' : i + 1}
-                </div>
-                <span style={{ fontSize: 14, fontWeight: done ? 600 : 400, color: done ? '#1A1A2E' : '#8888A8' }}>
-                  {loc.name}
-                </span>
+        {/* Комбінований маршрут — підсумок по гілках */}
+        {isCombined ? (
+          <div style={{ background: '#fff', borderRadius: 20, border: '1px solid #EEEEF5', overflow: 'hidden' }}>
+            <div style={{ padding: '14px 18px', borderBottom: '1px solid #EEEEF5', fontSize: 13, fontWeight: 700, color: '#8888A8' }}>
+              Комбінований маршрут · {branches.length} {branches.length === 2 ? 'лінії' : 'ліній'}
+            </div>
+            {branches.map((b, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 18px', borderBottom: i < branches.length - 1 ? '1px solid #EEEEF5' : 'none' }}>
+                <div style={{ width: 12, height: 12, borderRadius: '50%', flexShrink: 0, background: lineColor(b.line) }} />
+                <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: '#1A1A2E' }}>{lineLabel(b.line)}</span>
+                <span style={{ fontSize: 13, color: '#8888A8' }}>{b.completedSlugs.length} точок</span>
               </div>
-            );
-          })}
-        </div>
+            ))}
+          </div>
+        ) : (
+          /* Чистий прохід — детальний список локацій */
+          <div style={{ background: '#fff', borderRadius: 20, border: '1px solid #EEEEF5', overflow: 'hidden' }}>
+            <div style={{ padding: '14px 18px', borderBottom: '1px solid #EEEEF5', fontSize: 13, fontWeight: 700, color: '#8888A8' }}>
+              Маршрут пройдено
+            </div>
+            {lineSpots.map((loc, i) => {
+              const done = session.completedSlugs.includes(loc.slug);
+              return (
+                <div key={loc.slug} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 18px', borderBottom: i < lineSpots.length - 1 ? '1px solid #EEEEF5' : 'none' }}>
+                  <div style={{ width: 24, height: 24, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: done ? '#fff' : '#8888A8', background: done ? color : '#EEEEF5' }}>
+                    {done ? '✓' : i + 1}
+                  </div>
+                  <span style={{ fontSize: 14, fontWeight: done ? 600 : 400, color: done ? '#1A1A2E' : '#8888A8' }}>
+                    {loc.name}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* Магазин привілеїв */}
         <div style={{ background: 'linear-gradient(135deg, #1a1a2e, #2d1f4e)', borderRadius: 20, padding: '20px 24px', display: 'flex', alignItems: 'center', gap: 16, cursor: 'pointer' }} onClick={() => router.push('/shop')}>
