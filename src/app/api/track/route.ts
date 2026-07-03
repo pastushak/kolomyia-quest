@@ -60,11 +60,22 @@ export async function POST(req: NextRequest) {
         const finishBonus    = isModification ? 100 : 300;
         const totalAward      = (body.finalXp ?? 0) + finishBonus;
 
+        // Назва маршруту для комбінованого проходу: беремо задану туристом,
+        // інакше автоназва "Маршрут #00N" (N — персональний номер комбінованого проходу).
+        let routeName = '';
+        if (isModification) {
+          const userDoc = await UserModel.findById(body.userId).select('completedLines').lean() as any;
+          const modCount = (userDoc?.completedLines ?? []).filter((l: any) => l.type === 'modification').length;
+          const provided = (body.name ?? '').trim();
+          routeName = provided || `Маршрут #${String(modCount + 1).padStart(3, '0')}`;
+        }
+
         const completedLineEntry = isModification
           ? {
               type:         'modification',
               line:         null,
               modification: body.modification ?? '',   // нотація "cherry(3)-orange(4)"
+              name:         routeName,
               branches:     body.branches ?? [],         // [{ line, count }]
               ageGroup:     body.ageGroup,
               completedAt:  new Date(),
@@ -74,6 +85,7 @@ export async function POST(req: NextRequest) {
               type:         'pure',
               line:         body.line ?? null,
               modification: null,
+              name:         '',
               branches:     [],
               ageGroup:     body.ageGroup,
               completedAt:  new Date(),

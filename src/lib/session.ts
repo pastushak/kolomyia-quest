@@ -134,7 +134,7 @@ export async function completeSpot(
 }
 
 // ── Фініш сесії ───────────────────────────────────────────
-export async function finishSession(): Promise<void> {
+export async function finishSession(routeName?: string): Promise<void> {
   const sid     = getDbSessionId();
   const session = getSession();
   if (!sid || !session) return;
@@ -163,6 +163,7 @@ export async function finishSession(): Promise<void> {
     transferCount,
     modification,                           // "" якщо чиста лінія
     branches:      branchStats,             // [] якщо чиста лінія
+    name:          (routeName ?? '').trim(),   // назва маршруту (для комбінованого)
   });
 }
 

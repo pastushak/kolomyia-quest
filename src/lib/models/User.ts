@@ -10,6 +10,7 @@ const CompletedLineSchema = new Schema({
   type:         { type: String, enum: ['pure', 'modification'], default: 'pure' },
   line:         { type: String, default: null },  // для 'pure'
   modification: { type: String, default: null },   // для 'modification' — нотація "cherry(3)-green(4)"
+  name:         { type: String, default: '' },     // назва маршруту (комбінований; задає турист або автоназва)
   branches:     { type: [BranchStatSchema], default: [] },
   ageGroup:     { type: String, enum: ['kids', 'teens', 'adults'], required: true },
   completedAt:  { type: Date, default: Date.now },

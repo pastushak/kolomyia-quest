@@ -18,6 +18,10 @@ export default function FinishPage() {
   const [mounted, setMounted]   = useState(false);
   const [lineSpots, setLineSpots] = useState<{ slug: string; name: string }[]>([]);
   const [phase, setPhase]       = useState<Phase>('video');
+  const [routeName, setRouteName] = useState('');   // введена туристом назва комбінованого маршруту
+  const [savedName, setSavedName] = useState('');   // фінальна назва (після збереження)
+  const [needsNaming, setNeedsNaming] = useState(false);   // показувати модалку іменування
+  const [saving, setSaving]     = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -25,16 +29,40 @@ export default function FinishPage() {
     if (!s) { router.push('/'); return; }
     setSession(s);
 
-    // Guard: фінішуємо лише один раз на сесію (не повторюємо при релоуді)
+    const isCombinedRun = (s.transferCount ?? 0) > 0 && (s.branches?.length ?? 0) > 1;
+    const isLoggedIn    = !!s.userId;
+
     const sid = localStorage.getItem('kq_sid');
     const finishedKey = sid ? `kq_finished_${sid}` : null;
-    if (finishedKey && !localStorage.getItem(finishedKey)) {
-      finishSession();
-      localStorage.setItem(finishedKey, '1');
+    const alreadyFinished = finishedKey ? !!localStorage.getItem(finishedKey) : false;
+
+    if (!alreadyFinished) {
+      if (isCombinedRun && isLoggedIn) {
+        // Комбінований + залогінений → відкладаємо фініш до вводу назви (модалка).
+        setNeedsNaming(true);
+      } else {
+        // Чистий прохід або анонім → фінішимо одразу.
+        finishSession();
+        if (finishedKey) localStorage.setItem(finishedKey, '1');
+      }
+    } else {
+      // Вже фінішовано раніше — показуємо збережену назву, якщо була.
+      setSavedName('');
     }
 
     fetchLine(s.line).then(data => setLineSpots(data.spots));
   }, []);
+
+  // Збереження назви маршруту → фініш із назвою.
+  async function handleSaveName() {
+    setSaving(true);
+    await finishSession(routeName);
+    const sid = localStorage.getItem('kq_sid');
+    if (sid) localStorage.setItem(`kq_finished_${sid}`, '1');
+    setSavedName(routeName.trim());
+    setNeedsNaming(false);
+    setSaving(false);
+  }
 
   function goToResults() {
     setPhase('results');
@@ -130,6 +158,35 @@ export default function FinishPage() {
   // ── ФАЗА 2: Результати ────────────────────────────────────
   return (
     <main style={{ minHeight: '100vh', background: '#F7F7FC', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 16px' }}>
+
+      {/* Модалка іменування комбінованого маршруту */}
+      {needsNaming && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(26,26,46,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, zIndex: 100 }}>
+          <div style={{ background: '#fff', borderRadius: 24, padding: 28, width: '100%', maxWidth: 400, textAlign: 'center' }}>
+            <div style={{ fontSize: 44, marginBottom: 8 }}>🗺️</div>
+            <h2 style={{ fontSize: 20, fontWeight: 900, color: '#1A1A2E', margin: '0 0 8px' }}>Назви свій маршрут!</h2>
+            <p style={{ fontSize: 14, color: '#8888A8', margin: '0 0 20px', lineHeight: 1.5 }}>
+              Ти пройшов унікальний комбінований маршрут через {session.branches?.length ?? 0} лінії. Дай йому назву — або лишень порожнім для автоназви.
+            </p>
+            <input
+              value={routeName}
+              onChange={e => setRouteName(e.target.value.slice(0, 40))}
+              placeholder="напр. Стежками старого міста"
+              autoFocus
+              style={{ width: '100%', padding: '13px 16px', borderRadius: 14, border: '1.5px solid #EEEEF5', fontSize: 15, outline: 'none', boxSizing: 'border-box', marginBottom: 8, textAlign: 'center' }}
+            />
+            <div style={{ fontSize: 11, color: '#AAAAB8', marginBottom: 20 }}>{routeName.length}/40 · пропустиш — буде «Маршрут #00N»</div>
+            <button
+              onClick={handleSaveName}
+              disabled={saving}
+              style={{ width: '100%', padding: 15, borderRadius: 14, border: 'none', background: color, color: '#fff', fontSize: 16, fontWeight: 700, cursor: saving ? 'wait' : 'pointer' }}
+            >
+              {saving ? 'Зберігаємо…' : 'Зберегти маршрут →'}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div style={{
         width: '100%', maxWidth: 420,
         opacity: visible ? 1 : 0,
@@ -146,7 +203,7 @@ export default function FinishPage() {
         {/* Головна картка */}
         <div style={{ background: '#fff', borderRadius: 24, border: '1px solid #EEEEF5', padding: '28px 24px', textAlign: 'center' }}>
           <div style={{ fontSize: 13, fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
-            {isCombined ? 'Комбінований маршрут — пройдено!' : `${label} — пройдено!`}
+            {isCombined ? (savedName ? `«${savedName}» — пройдено!` : 'Комбінований маршрут — пройдено!') : `${label} — пройдено!`}
           </div>
           <h1 style={{ fontSize: 28, fontWeight: 900, color: '#1A1A2E', margin: '0 0 6px', lineHeight: 1.2 }}>
             Ти дослідив<br />Коломию!
@@ -184,7 +241,19 @@ export default function FinishPage() {
 
         {/* Комбінований маршрут — підсумок по гілках */}
         {isCombined ? (
-          <div style={{ background: '#fff', borderRadius: 20, border: '1px solid #EEEEF5', overflow: 'hidden' }}>
+          <>
+            {!session.userId && (
+              <div style={{ background: 'linear-gradient(135deg, #89182c, #5a0f1d)', borderRadius: 20, padding: '18px 20px', color: '#fff' }}>
+                <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>🔒 Збережи свій маршрут</div>
+                <div style={{ fontSize: 13, opacity: 0.85, lineHeight: 1.5, marginBottom: 12 }}>
+                  Увійди, щоб дати назву цьому унікальному маршруту, зберегти його в профілі та отримати цифровий бейдж.
+                </div>
+                <button onClick={() => router.push('/')} style={{ padding: '9px 18px', borderRadius: 12, border: '1.5px solid rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.12)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+                  Увійти →
+                </button>
+              </div>
+            )}
+            <div style={{ background: '#fff', borderRadius: 20, border: '1px solid #EEEEF5', overflow: 'hidden' }}>
             <div style={{ padding: '14px 18px', borderBottom: '1px solid #EEEEF5', fontSize: 13, fontWeight: 700, color: '#8888A8' }}>
               Комбінований маршрут · {branches.length} {branches.length === 2 ? 'лінії' : 'ліній'}
             </div>
@@ -195,7 +264,8 @@ export default function FinishPage() {
                 <span style={{ fontSize: 13, color: '#8888A8' }}>{b.completedSlugs.length} точок</span>
               </div>
             ))}
-          </div>
+            </div>
+          </>
         ) : (
           /* Чистий прохід — детальний список локацій */
           <div style={{ background: '#fff', borderRadius: 20, border: '1px solid #EEEEF5', overflow: 'hidden' }}>
