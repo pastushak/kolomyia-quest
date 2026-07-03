@@ -38,11 +38,23 @@ export async function POST(req: NextRequest) {
       }, { status: 409 });
     }
 
-    // Перевіряємо баланс XP
-    const user = await UserModel.findById(session.user.id).lean<{ totalXp: number }>();
-    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    if (user.totalXp < item.xpCost) {
-      return NextResponse.json({ error: 'Not enough XP', required: item.xpCost, current: user.totalXp }, { status: 402 });
+    // Атомарно списуємо XP ТІЛЬКИ якщо балансу вистачає (totalXp >= xpCost).
+    // Один запит замість «прочитати → перевірити → списати» — усуває гонку:
+    // два паралельні redeem (подвійний тап / два таби) більше не можуть
+    // обидва пройти перевірку до списання й загнати баланс у мінус.
+    const debited = await UserModel.findOneAndUpdate(
+      { _id: session.user.id, totalXp: { $gte: item.xpCost } },
+      { $inc: { totalXp: -item.xpCost } },
+      { new: true },
+    ).lean<{ totalXp: number }>();
+
+    if (!debited) {
+      // Балансу не вистачило (або юзера немає) — нічого не списано.
+      const current = await UserModel.findById(session.user.id).select('totalXp').lean<{ totalXp: number }>();
+      return NextResponse.json(
+        { error: 'Not enough XP', required: item.xpCost, current: current?.totalXp ?? 0 },
+        { status: 402 },
+      );
     }
 
     // Генеруємо унікальний код купону
@@ -52,15 +64,21 @@ export async function POST(req: NextRequest) {
     const ACTIVE_HOURS = item.type === 'info' ? 48 : 24;
     const expiresAt = new Date(Date.now() + ACTIVE_HOURS * 60 * 60 * 1000);
 
-    // Списуємо XP і створюємо купон
-    await UserModel.findByIdAndUpdate(session.user.id, { $inc: { totalXp: -item.xpCost } });
-    const redemption = await RedemptionModel.create({
-      userId:   session.user.id,
-      itemId,
-      code,
-      xpSpent:  item.xpCost,
-      expiresAt,
-    });
+    // XP уже списано атомарно вище. Створюємо купон; якщо create впаде —
+    // повертаємо списані XP назад (компенсація), щоб турист не втратив бали.
+    let redemption;
+    try {
+      redemption = await RedemptionModel.create({
+        userId:   session.user.id,
+        itemId,
+        code,
+        xpSpent:  item.xpCost,
+        expiresAt,
+      });
+    } catch (createErr) {
+      await UserModel.findByIdAndUpdate(session.user.id, { $inc: { totalXp: item.xpCost } });
+      throw createErr;
+    }
 
     return NextResponse.json({
       ok: true,
