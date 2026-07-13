@@ -277,6 +277,7 @@ export default function SpotPage() {
               line={line}
               lineColor={color}
               isSharedSpot={(spot.transfers ?? []).some(t => t !== line)}
+              isLastSpot={getNextSlug(order, slug) === null}
               onComplete={handleQuizComplete}
             />
           ) : (

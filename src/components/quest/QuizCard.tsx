@@ -13,11 +13,12 @@ interface Props {
   lineColor:  string;
   onComplete: (sessionXp: number) => void;   // повертає серверний баланс сесії
   isSharedSpot?: boolean;   // shared-спот: пропустити екран «Чудово», спот покаже блок пересадки
+  isLastSpot?: boolean;     // остання точка лінії: кнопка веде «До результатів →» (не «наступна точка»)
 }
 
 const MAX_ATTEMPTS = 3;
 
-export default function QuizCard({ questions, qid, slug, line, lineColor, onComplete, isSharedSpot }: Props) {
+export default function QuizCard({ questions, qid, slug, line, lineColor, onComplete, isSharedSpot, isLastSpot }: Props) {
   const router = useRouter();
   const [current, setCurrent]     = useState(0);
   const [selected, setSelected]   = useState<number | null>(null);   // обраний варіант (ще не підтверджений)
@@ -137,7 +138,7 @@ export default function QuizCard({ questions, qid, slug, line, lineColor, onComp
           onClick={() => onComplete(sessionXp ?? 0)}
           style={{ display: 'block', width: '100%', padding: 16, borderRadius: 16, border: 'none', background: lineColor, color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer' }}
         >
-          До наступної точки →
+          {isLastSpot ? 'До результатів →' : 'До наступної точки →'}
         </button>
       </div>
     );
