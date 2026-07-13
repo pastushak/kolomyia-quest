@@ -17,7 +17,25 @@ type UserRow = {
 
 type SortKey = 'xp' | 'recent' | 'created' | 'name';
 
+type Analytics = {
+  totalUsers: number;
+  activeWeek: number;
+  newWeek: number;
+  finishedUsers: number;
+  totalXp: number;
+  avgXp: number;
+  maxXp: number;
+  lines:  { cherry: number; orange: number; green: number; combined: number };
+  ages:   { kids: number; teens: number; adults: number };
+};
+
 const CHERRY = '#89182c';
+const LINE_COLORS: Record<string, string> = {
+  cherry: '#89182c', orange: '#D4621A', green: '#2D7A4F', combined: '#8888A8',
+};
+const LINE_LABELS: Record<string, string> = {
+  cherry: 'Вишнева', orange: 'Оранжева', green: 'Зелена', combined: 'Комбіновані',
+};
 
 function fmtDate(iso: string | null): string {
   if (!iso) return '—';
@@ -33,6 +51,9 @@ export default function UsersTab() {
   const [error, setError]     = useState('');
   const [search, setSearch]   = useState('');
   const [sort, setSort]       = useState<SortKey>('xp');
+
+  // Аналітика (зведення зверху)
+  const [analytics, setAnalytics] = useState<Analytics | null>(null);
 
   // Картка вибраного користувача + стан дій
   const [selected, setSelected] = useState<UserRow | null>(null);
@@ -75,6 +96,17 @@ export default function UsersTab() {
     return () => clearTimeout(t);
   }, [load]);
 
+  // Аналітика — вантажимо раз при відкритті таба
+  const loadAnalytics = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/users/stats');
+      if (!res.ok) return;
+      setAnalytics(await res.json());
+    } catch { /* тихо: аналітика не критична */ }
+  }, []);
+
+  useEffect(() => { loadAnalytics(); }, [loadAnalytics]);
+
   // ── Дії над вибраним користувачем ──────────────────────
   async function changeRole(newRole: 'user' | 'admin') {
     if (!selected) return;
@@ -110,6 +142,7 @@ export default function UsersTab() {
       setSelected({ ...selected, totalXp: 0, completedCount: 0 });
       setConfirmReset(false);
       await load();
+      loadAnalytics();
     } catch {
       setActionError('Помилка мережі');
     } finally {
@@ -126,6 +159,7 @@ export default function UsersTab() {
       if (!res.ok) { setActionError(data.error || 'Не вдалося видалити'); setBusy(false); return; }
       closeCard();
       await load();
+      loadAnalytics();
     } catch {
       setActionError('Помилка мережі');
       setBusy(false);
@@ -149,12 +183,67 @@ export default function UsersTab() {
           </p>
         </div>
         <button
-          onClick={load}
+          onClick={() => { load(); loadAnalytics(); }}
           style={{ padding: '8px 18px', borderRadius: 12, border: '1.5px solid #EEEEF5', background: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
         >
           ↻ Оновити
         </button>
       </div>
+
+      {/* Аналітика */}
+      {analytics && (
+        <div style={{ marginBottom: 20 }}>
+          {/* Верхні метрики */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10, marginBottom: 12 }}>
+            {[
+              { label: 'Усього юзерів', value: analytics.totalUsers, color: '#1A1A2E' },
+              { label: 'Активні (7 дн)', value: analytics.activeWeek, color: '#2D7A4F' },
+              { label: 'Нові (7 дн)', value: analytics.newWeek, color: '#D4621A' },
+              { label: 'Завершили квест', value: analytics.finishedUsers, color: CHERRY },
+            ].map(m => (
+              <div key={m.label} style={{ background: '#fff', border: '1px solid #EEEEF5', borderRadius: 14, padding: '14px 16px' }}>
+                <div style={{ fontSize: 24, fontWeight: 800, color: m.color }}>{m.value}</div>
+                <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>{m.label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* XP + розподіл по лініях */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 10 }}>
+            {/* XP */}
+            <div style={{ background: '#fff', border: '1px solid #EEEEF5', borderRadius: 14, padding: '14px 16px' }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#888', marginBottom: 10 }}>XP</div>
+              <div style={{ display: 'flex', gap: 16 }}>
+                <div><div style={{ fontSize: 18, fontWeight: 800, color: CHERRY }}>{analytics.totalXp}</div><div style={{ fontSize: 10, color: '#aaa' }}>сумарно</div></div>
+                <div><div style={{ fontSize: 18, fontWeight: 800, color: '#1A1A2E' }}>{analytics.avgXp}</div><div style={{ fontSize: 10, color: '#aaa' }}>у середньому</div></div>
+                <div><div style={{ fontSize: 18, fontWeight: 800, color: '#1A1A2E' }}>{analytics.maxXp}</div><div style={{ fontSize: 10, color: '#aaa' }}>максимум</div></div>
+              </div>
+            </div>
+
+            {/* Розподіл по лініях */}
+            <div style={{ background: '#fff', border: '1px solid #EEEEF5', borderRadius: 14, padding: '14px 16px' }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#888', marginBottom: 10 }}>ЗАВЕРШЕНІ МАРШРУТИ</div>
+              {(() => {
+                const entries = ['cherry', 'orange', 'green', 'combined'] as const;
+                const max = Math.max(1, ...entries.map(k => analytics.lines[k]));
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {entries.map(k => (
+                      <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 11, color: '#888', width: 84, flexShrink: 0 }}>{LINE_LABELS[k]}</span>
+                        <div style={{ flex: 1, height: 8, background: '#f0f0f4', borderRadius: 4, overflow: 'hidden' }}>
+                          <div style={{ width: `${(analytics.lines[k] / max) * 100}%`, height: '100%', background: LINE_COLORS[k] }} />
+                        </div>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: '#1A1A2E', width: 28, textAlign: 'right' }}>{analytics.lines[k]}</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Пошук + сортування */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
