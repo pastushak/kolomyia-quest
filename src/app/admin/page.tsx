@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { lineColor, lineLabel, ensureLinesRegistered } from '@/lib/utils';
 import { Line } from '@/types';
 import QRCode from 'qrcode';
+import UsersTab from '@/components/admin/UsersTab';
 
 // ── Типи ─────────────────────────────────────────────────
 
@@ -80,7 +81,7 @@ function QRItem({ url, label, sublabel, color }: { url: string; label: string; s
 
 // ── Головний компонент ─────────────────────────────────────
 
-type Tab = 'stats' | 'spots' | 'lines' | 'qr' | 'shop';
+type Tab = 'stats' | 'spots' | 'lines' | 'qr' | 'shop' | 'users';
 
 export default function AdminPage() {
   const [tab, setTab] = useState<Tab>('stats');
@@ -358,6 +359,7 @@ export default function AdminPage() {
     { key: 'lines', label: 'Маршрути',   icon: '🛤️' },
     { key: 'qr',    label: 'QR-коди',    icon: '📱' },
     { key: 'shop',  label: 'Магазин',    icon: '🏪' },
+    { key: 'users', label: 'Користувачі', icon: '👥' },
   ];
 
   return (
@@ -1183,6 +1185,9 @@ export default function AdminPage() {
             )}
           </>
         )}
+
+        {/* ── ТАБ: КОРИСТУВАЧІ ── */}
+        {tab === 'users' && <UsersTab />}
 
       </div>
     </div>
