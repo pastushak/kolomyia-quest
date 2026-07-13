@@ -408,15 +408,16 @@ async function seed() {
   // ── Споти (БЕЗПЕЧНИЙ upsert — НЕ чіпає quizzes з адмінки) ─────────
   console.log(`📍 Upsert ${SPOTS.length} спотів (quizzes зберігаються)...`);
   for (const spot of SPOTS) {
-    // Оновлюємо лише структурні поля. quizzes навмисно НЕ чіпаємо —
-    // щоб контент, доданий через адмінку, не затирався сідом.
-    const { quizzes, ...structuralFields } = spot;
+    // Оновлюємо лише структурні поля. quizzes та audioUrl навмисно НЕ чіпаємо —
+    // це контент, який команда додає через адмінку (аудіо-екскурсії, питання).
+    // Якщо їх класти в $set, повторний seed затре наповнення. Тому — $setOnInsert.
+    const { quizzes, audioUrl, ...structuralFields } = spot;
     await SpotModel.updateOne(
       { slug: spot.slug },
       {
         $set: structuralFields,
-        // quizzes ставимо ТІЛЬКИ при першому створенні (insert), не при оновленні:
-        $setOnInsert: { quizzes: quizzes ?? null },
+        // quizzes та audioUrl ставимо ТІЛЬКИ при першому створенні (insert), не при оновленні:
+        $setOnInsert: { quizzes: quizzes ?? null, audioUrl: audioUrl ?? '' },
       },
       { upsert: true },
     );
