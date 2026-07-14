@@ -44,6 +44,7 @@ export async function GET() {
       xpTotal: number;
       startedAt: Date;
       finishedAt: Date;
+      transferCount: number;
     }>>();
 
     // Унікальні відвідані локації (а не сума з повторами й shared-спотами).
@@ -67,6 +68,19 @@ export async function GET() {
       return sum + Math.min(diff, MAX_SESSION_MIN);    // обрізаємо аномально довгі
     }, 0);
 
+    // ── Дані для бейджів ────────────────────────────────────
+    const finishHours = sessions
+      .filter(s => s.finishedAt)
+      .map(s => new Date(s.finishedAt).getHours());
+
+    const finishMonths = (user.completedLines ?? [])
+      .filter((l: any) => l.completedAt)
+      .map((l: any) => new Date(l.completedAt).getMonth());   // 0=січ..11=груд
+
+    const maxTransfers = sessions.reduce(
+      (max, s) => Math.max(max, s.transferCount ?? 0), 0
+    );
+
     return NextResponse.json({
       name:           user.name,
       email:          user.email,
@@ -78,6 +92,12 @@ export async function GET() {
         totalSessions:  sessions.length,
         totalLocations,
         totalMinutes,
+      },
+      badgeData: {
+        visitedSlugs: Array.from(uniqueSlugs),
+        finishHours,
+        finishMonths,
+        maxTransfers,
       },
     });
   } catch (err) {

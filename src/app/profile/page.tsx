@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
-import { lineColor, lineLabel, lineEmoji, ensureLinesRegistered, fetchAllLines } from '@/lib/utils';
+import { lineColor, lineLabel, ensureLinesRegistered, fetchAllLines } from '@/lib/utils';
 
 interface BranchStat {
   line:  string;
@@ -40,6 +40,30 @@ interface ProfileData {
     totalLocations: number;
     totalMinutes:   number;
   };
+  badgeData?: {
+    visitedSlugs: string[];
+    finishHours:  number[];
+    finishMonths: number[];
+    maxTransfers: number;
+  };
+}
+
+// Тематичні групи спотів (для бейджів «усі храми», «усі музеї» тощо)
+const THEME_SLUGS = {
+  temples:    ['cathedral_ugkc', 'cathedral_pcu', 'church_josafat', 'blahovisn_church', 'mykhailivsky_cathedral', 'kostel_loyola'],
+  museums:    ['museum_history', 'pysanka_museum', 'museum_hutsulshchyna'],
+  monuments:  ['hudzyk', 'franko_monument', 'hrushevsky_monument'],
+  culture:    ['theatre_ozarkevych', 'narodnyi_dim', 'filarmoniya'],
+  nature:     ['park_trylovskoho', 'ozero_rufa', 'ploshcha_skorboty'],
+};
+
+// Скільки XP заробив на пройдених лініях (для дистинкцій, не критично)
+function visited(p: ProfileData): Set<string> {
+  return new Set(p.badgeData?.visitedSlugs ?? []);
+}
+function hasAllSlugs(p: ProfileData, slugs: string[]): boolean {
+  const v = visited(p);
+  return slugs.every(s => v.has(s));
 }
 
 // Чи пройдено лінію: або як чисту (pure), або у складі комбінованого маршруту
@@ -56,9 +80,81 @@ function hasCombined(p: ProfileData): boolean {
   return p.completedLines.some(l => l.type === 'modification');
 }
 
-// Емоджі лінії для бейджа (реєстр → фолбек «прапорець»)
-function lineEmojiFor(line: string): string {
-  return lineEmoji(line, '🚩');
+type Badge = { id: string; icon: string; name: string; unlocked: boolean };
+type BadgeGroup = { title: string; badges: Badge[] };
+
+// Формуємо всі 30 бейджів, згрупованих за категоріями.
+function buildBadges(p: ProfileData, lines: LineInfo[]): BadgeGroup[] {
+  const xp     = p.totalXp;
+  const routes = p.stats.totalSessions;
+  const locs   = p.stats.totalLocations;
+  const bd      = p.badgeData;
+  const hours   = bd?.finishHours ?? [];
+  const months  = bd?.finishMonths ?? [];
+  const maxTr   = bd?.maxTransfers ?? 0;
+
+  return [
+    {
+      title: 'Старт',
+      badges: [
+        { id: 'explorer',  icon: '🏅', name: 'Дослідник Коломиї', unlocked: routes >= 1 },
+        { id: 'first_loc', icon: '🎫', name: 'Перші кроки',        unlocked: locs >= 1 },
+        { id: 'welcome',   icon: '👋', name: 'Вітаємо в грі',      unlocked: true },
+      ],
+    },
+    {
+      title: 'Досвід',
+      badges: [
+        { id: 'xp100',  icon: '⭐', name: 'Новачок',          unlocked: xp >= 100 },
+        { id: 'xp500',  icon: '🌟', name: 'Бувалий',          unlocked: xp >= 500 },
+        { id: 'xp1000', icon: '🐾', name: 'Друг Ґудзика',     unlocked: xp >= 1000 },
+        { id: 'xp2500', icon: '💎', name: 'Знавець міста',    unlocked: xp >= 2500 },
+        { id: 'xp5000', icon: '👑', name: 'Легенда Коломиї',  unlocked: xp >= 5000 },
+      ],
+    },
+    {
+      title: 'Лінії',
+      badges: [
+        { id: 'line_cherry', icon: '🚂', name: 'Вишнева лінія',  unlocked: hasLine(p, 'cherry') },
+        { id: 'line_orange', icon: '🚌', name: 'Оранжева лінія', unlocked: hasLine(p, 'orange') },
+        { id: 'line_green',  icon: '🌿', name: 'Зелена лінія',   unlocked: hasLine(p, 'green') },
+        { id: 'all_lines',   icon: '🏆', name: 'Всі лінії',      unlocked: lines.length > 0 && lines.every(l => hasLine(p, l.key)) },
+        { id: 'combined',    icon: '🔀', name: 'Свій маршрут',   unlocked: hasCombined(p) },
+      ],
+    },
+    {
+      title: 'Наполегливість',
+      badges: [
+        { id: 'routes3',  icon: '🥉', name: '3 маршрути',   unlocked: routes >= 3 },
+        { id: 'routes5',  icon: '🥈', name: '5 маршрутів',  unlocked: routes >= 5 },
+        { id: 'routes10', icon: '🥇', name: '10 маршрутів', unlocked: routes >= 10 },
+        { id: 'locs10',   icon: '🗺️', name: '10 локацій',   unlocked: locs >= 10 },
+        { id: 'locs20',   icon: '🧭', name: '20 локацій',   unlocked: locs >= 20 },
+        { id: 'locs_all', icon: '🏙️', name: 'Уся Коломия',  unlocked: locs >= 24 },
+      ],
+    },
+    {
+      title: 'Знавець',
+      badges: [
+        { id: 'theme_temples',   icon: '⛪', name: 'Прочанин',            unlocked: hasAllSlugs(p, THEME_SLUGS.temples) },
+        { id: 'theme_museums',   icon: '🖼️', name: 'Музейник',            unlocked: hasAllSlugs(p, THEME_SLUGS.museums) },
+        { id: 'theme_monuments', icon: '🗿', name: 'Знавець пам’ятників', unlocked: hasAllSlugs(p, THEME_SLUGS.monuments) },
+        { id: 'theme_culture',   icon: '🎭', name: 'Меценат культури',    unlocked: hasAllSlugs(p, THEME_SLUGS.culture) },
+        { id: 'theme_nature',    icon: '🌳', name: 'Природолюб',          unlocked: hasAllSlugs(p, THEME_SLUGS.nature) },
+        { id: 'hudzyk_spot',     icon: '🐱', name: 'Обійняв Ґудзика',     unlocked: visited(p).has('hudzyk') },
+      ],
+    },
+    {
+      title: 'Особливі',
+      badges: [
+        { id: 'early',    icon: '🌅', name: 'Ранній птах',       unlocked: hours.some(h => h < 9) },
+        { id: 'night',    icon: '🌙', name: 'Нічний мандрівник', unlocked: hours.some(h => h >= 21) },
+        { id: 'winter',   icon: '❄️', name: 'Зимовий гість',     unlocked: months.some(m => m === 11 || m <= 1) },
+        { id: 'summer',   icon: '☀️', name: 'Літній турист',     unlocked: months.some(m => m >= 5 && m <= 7) },
+        { id: 'transfers', icon: '🔁', name: 'Майстер пересадок', unlocked: maxTr >= 3 },
+      ],
+    },
+  ];
 }
 
 function getLevel(xp: number) {
@@ -266,39 +362,32 @@ export default function ProfilePage() {
         </div>
 
         {/* Бейджі */}
-        <div style={card}>
-          <div style={label}>Бейджі</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-            {(() => {
-              // Бейджі формуємо динамічно: базові + по одному на кожну живу лінію.
-              const badges: { id: string; icon: string; name: string; unlocked: boolean }[] = [];
-              badges.push({ id: 'explorer', icon: '🏅', name: 'Дослідник Коломиї', unlocked: profile.stats.totalSessions >= 1 });
-              for (const l of lines) {
-                badges.push({
-                  id: `line_${l.key}`,
-                  icon: lineEmojiFor(l.key),
-                  name: lineLabel(l.key),
-                  unlocked: hasLine(profile, l.key),
-                });
-              }
-              badges.push({
-                id: 'all_lines',
-                icon: '🏆',
-                name: 'Всі лінії',
-                unlocked: lines.length > 0 && lines.every(l => hasLine(profile, l.key)),
-              });
-              badges.push({ id: 'combined', icon: '🔀', name: 'Свій маршрут', unlocked: hasCombined(profile) });
-              badges.push({ id: 'hudzyk', icon: '🐾', name: 'Друг Ґудзика', unlocked: profile.totalXp >= 1000 });
-
-              return badges.map(badge => (
-                <div key={badge.id} style={{ background: '#faf8f5', borderRadius: 14, padding: '14px 8px', textAlign: 'center', border: '1.5px solid #f0ece6', opacity: badge.unlocked ? 1 : 0.35, filter: badge.unlocked ? 'none' : 'grayscale(1)' }}>
-                  <div style={{ fontSize: 28, marginBottom: 6 }}>{badge.icon}</div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#1a1a2e', lineHeight: 1.3 }}>{badge.name}</div>
+        {(() => {
+          const groups = buildBadges(profile, lines);
+          const all      = groups.flatMap(g => g.badges);
+          const earned   = all.filter(b => b.unlocked).length;
+          return (
+            <div style={card}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                <div style={{ ...label, marginBottom: 0 }}>Бейджі</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#89182c' }}>{earned} / {all.length}</div>
+              </div>
+              {groups.map(group => (
+                <div key={group.title} style={{ marginBottom: 18 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#888', marginBottom: 10 }}>{group.title.toUpperCase()}</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+                    {group.badges.map(badge => (
+                      <div key={badge.id} style={{ background: '#faf8f5', borderRadius: 14, padding: '14px 8px', textAlign: 'center', border: '1.5px solid #f0ece6', opacity: badge.unlocked ? 1 : 0.35, filter: badge.unlocked ? 'none' : 'grayscale(1)' }}>
+                        <div style={{ fontSize: 28, marginBottom: 6 }}>{badge.icon}</div>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: '#1a1a2e', lineHeight: 1.3 }}>{badge.name}</div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ));
-            })()}
-          </div>
-        </div>
+              ))}
+            </div>
+          );
+        })()}
         
         <button
           onClick={() => router.push('/shop')}
