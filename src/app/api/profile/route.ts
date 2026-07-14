@@ -46,15 +46,25 @@ export async function GET() {
       finishedAt: Date;
     }>>();
 
-    const totalLocations = sessions.reduce(
-      (sum, s) => sum + (s.completedSlugs?.length ?? 0), 0
-    );
+    // Унікальні відвідані локації (а не сума з повторами й shared-спотами).
+    // completedSlugs може повторюватися між сесіями — рахуємо кожен слаг раз.
+    const uniqueSlugs = new Set<string>();
+    for (const s of sessions) {
+      for (const slug of s.completedSlugs ?? []) uniqueSlugs.add(slug);
+    }
+    const totalLocations = uniqueSlugs.size;
 
+    // Час у місті з розумним лімітом на сесію. Реальний прохід — години, не дні.
+    // Якщо сесію забули закрити (різниця величезна), зараховуємо максимум MAX_SESSION_MIN,
+    // щоб один «завислий» сеанс не роздував статистику.
+    const MAX_SESSION_MIN = 480;   // 8 год — щедра стеля на один маршрут
     const totalMinutes = sessions.reduce((sum, s) => {
       if (!s.startedAt || !s.finishedAt) return sum;
-      return sum + Math.round(
+      const diff = Math.round(
         (new Date(s.finishedAt).getTime() - new Date(s.startedAt).getTime()) / 60000
       );
+      if (diff <= 0) return sum;                       // некоректні/від'ємні — ігноруємо
+      return sum + Math.min(diff, MAX_SESSION_MIN);    // обрізаємо аномально довгі
     }, 0);
 
     return NextResponse.json({

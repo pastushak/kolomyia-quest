@@ -3,14 +3,29 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
-import { lineColor, lineLabel, ensureLinesRegistered } from '@/lib/utils';
-import { Line } from '@/types';
+import { lineColor, lineLabel, lineEmoji, ensureLinesRegistered, fetchAllLines } from '@/lib/utils';
+
+interface BranchStat {
+  line:  string;
+  count: number;
+}
 
 interface CompletedLine {
-  line:        string;
-  ageGroup:    string;
-  completedAt: string;
-  finalXp:     number;
+  type?:        'pure' | 'modification';
+  line:         string | null;
+  modification: string | null;
+  name?:        string;
+  branches?:    BranchStat[];
+  ageGroup:     string;
+  completedAt:  string;
+  finalXp:      number;
+}
+
+interface LineInfo {
+  key:    string;
+  label?: string;
+  color?: string;
+  status?: string;
 }
 
 interface ProfileData {
@@ -27,27 +42,37 @@ interface ProfileData {
   };
 }
 
-const ALL_LINES: Line[] = ['cherry', 'orange', 'green'];
+// Чи пройдено лінію: або як чисту (pure), або у складі комбінованого маршруту
+// (лінія фігурує в branches). Так пересадки теж зараховуються.
+function hasLine(p: ProfileData, line: string): boolean {
+  return p.completedLines.some(l =>
+    (l.type !== 'modification' && l.line === line) ||
+    (l.branches?.some(b => b.line === line) ?? false)
+  );
+}
 
-const BADGES = [
-  { id: 'explorer',    icon: '🏅', name: 'Дослідник Коломиї', condition: (p: ProfileData) => p.stats.totalSessions >= 1 },
-  { id: 'cherry',      icon: '🚂', name: 'Вишневий маршрут',  condition: (p: ProfileData) => p.completedLines.some(l => l.line === 'cherry') },
-  { id: 'orange',      icon: '🚌', name: 'Оранжевий маршрут', condition: (p: ProfileData) => p.completedLines.some(l => l.line === 'orange') },
-  { id: 'green',       icon: '🌿', name: 'Зелений маршрут',   condition: (p: ProfileData) => p.completedLines.some(l => l.line === 'green') },
-  { id: 'all_lines',   icon: '🏆', name: 'Всі три лінії',     condition: (p: ProfileData) => ALL_LINES.every(l => p.completedLines.some(c => c.line === l)) },
-  { id: 'hudzyk',      icon: '🐾', name: 'Друг Ґудзика',      condition: (p: ProfileData) => p.totalXp >= 1000 },
-];
+// Чи є хоч один комбінований маршрут (пройдений з пересадками)
+function hasCombined(p: ProfileData): boolean {
+  return p.completedLines.some(l => l.type === 'modification');
+}
+
+// Емоджі лінії для бейджа (реєстр → фолбек «прапорець»)
+function lineEmojiFor(line: string): string {
+  return lineEmoji(line, '🚩');
+}
 
 function getLevel(xp: number) {
   const thresholds = [0, 300, 700, 1500, 3000, 5000];
+  const maxLevel = thresholds.length;   // 6
   let level = 1;
   for (let i = 0; i < thresholds.length; i++) {
     if (xp >= thresholds[i]) level = i + 1;
   }
-  const current = thresholds[Math.min(level - 1, thresholds.length - 1)];
-  const next    = thresholds[Math.min(level, thresholds.length - 1)];
-  const progress = next > current ? ((xp - current) / (next - current)) * 100 : 100;
-  return { level, current, next, progress: Math.min(progress, 100) };
+  const isMax = level >= maxLevel;
+  const current = thresholds[level - 1];
+  const next    = isMax ? thresholds[maxLevel - 1] : thresholds[level];
+  const progress = isMax ? 100 : ((xp - current) / (next - current)) * 100;
+  return { level, current, next, progress: Math.min(progress, 100), isMax };
 }
 
 function formatDate(iso: string) {
@@ -63,7 +88,9 @@ export default function ProfilePage() {
   const router = useRouter();
   const { data: authSession, status } = useSession();
   const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [lines, setLines]     = useState<LineInfo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -72,10 +99,22 @@ export default function ProfilePage() {
     }
     if (status === 'authenticated') {
       ensureLinesRegistered();   // підтягнути кольори/назви ліній (зокрема нових)
-      fetch('/api/profile')
-        .then(r => r.json())
-        .then(data => { setProfile(data); setLoading(false); })
-        .catch(() => setLoading(false));
+      Promise.all([
+        fetch('/api/profile').then(r => {
+          if (!r.ok) throw new Error('profile');
+          return r.json();
+        }),
+        fetchAllLines().catch(() => [] as LineInfo[]),   // лінії — не критично, фолбек порожній
+      ])
+        .then(([profileData, linesData]) => {
+          setProfile(profileData);
+          // Показуємо лише «живі» лінії (не чернетки), у порядку з API
+          setLines(
+            (linesData as LineInfo[]).filter(l => (l.status ?? 'live') === 'live')
+          );
+          setLoading(false);
+        })
+        .catch(() => { setLoadError(true); setLoading(false); });
     }
   }, [status]);
 
@@ -88,9 +127,30 @@ export default function ProfilePage() {
     );
   }
 
-  if (!profile) return null;
+  if (loadError || !profile) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', flexDirection: 'column', gap: 16, padding: 24, textAlign: 'center' }}>
+        <div style={{ fontSize: 40 }}>😿</div>
+        <div style={{ fontSize: 15, color: '#666', maxWidth: 280 }}>
+          Не вдалося завантажити профіль. Перевір зʼєднання й спробуй ще раз.
+        </div>
+        <button
+          onClick={() => window.location.reload()}
+          style={{ padding: '10px 24px', borderRadius: 14, border: 'none', background: '#89182c', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
+        >
+          Оновити
+        </button>
+        <button
+          onClick={() => router.push('/')}
+          style={{ padding: '8px 24px', borderRadius: 14, border: 'none', background: 'transparent', color: '#888', fontSize: 13, cursor: 'pointer' }}
+        >
+          На головну
+        </button>
+      </div>
+    );
+  }
 
-  const { level, next, progress } = getLevel(profile.totalXp);
+  const { level, next, progress, isMax } = getLevel(profile.totalXp);
 
   return (
     <main style={{ minHeight: '100vh', background: '#faf8f5', paddingBottom: 60 }}>
@@ -133,7 +193,7 @@ export default function ProfilePage() {
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#888', marginTop: 6 }}>
             <span>Рівень {level}</span>
-            <span>{profile.totalXp} / {next} XP до рівня {level + 1}</span>
+            <span>{isMax ? 'Максимальний рівень 🏆' : `${profile.totalXp} / ${next} XP до рівня ${level + 1}`}</span>
           </div>
         </div>
 
@@ -158,40 +218,85 @@ export default function ProfilePage() {
         <div style={card}>
           <div style={label}>Маршрути</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {ALL_LINES.map(line => {
-              const done = profile.completedLines.find(l => l.line === line);
-              const color = lineColor(line);
+            {lines.map(l => {
+              const key   = l.key;
+              const done  = profile.completedLines.find(c => c.type !== 'modification' && c.line === key);
+              const viaCombo = !done && hasLine(profile, key);   // пройдено у складі комбінованого
+              const color = lineColor(key);
+              const active = !!done || viaCombo;
               return (
-                <div key={line} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px', borderRadius: 14, background: done ? color + '18' : '#faf8f5', opacity: done ? 1 : 0.5 }}>
+                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px', borderRadius: 14, background: active ? color + '18' : '#faf8f5', opacity: active ? 1 : 0.5 }}>
                   <div style={{ width: 12, height: 12, borderRadius: '50%', background: color, flexShrink: 0 }} />
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: '#1a1a2e', marginBottom: 2 }}>{lineLabel(line)}</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#1a1a2e', marginBottom: 2 }}>{lineLabel(key)}</div>
                     <div style={{ fontSize: 11, color: '#888' }}>
-                      {done ? formatDate(done.completedAt) : 'Ще не пройдено'}
+                      {done ? formatDate(done.completedAt) : viaCombo ? 'Пройдено у комбінованому маршруті' : 'Ще не пройдено'}
                     </div>
                   </div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: done ? color : '#ccc' }}>
-                    {done ? `+${done.finalXp} XP` : '—'}
+                  <div style={{ fontSize: 14, fontWeight: 700, color: active ? color : '#ccc' }}>
+                    {done ? `+${done.finalXp} XP` : viaCombo ? '✓' : '—'}
                   </div>
                 </div>
               );
             })}
           </div>
+
+          {/* Комбіновані маршрути (пройдені з пересадками) */}
+          {profile.completedLines.filter(l => l.type === 'modification').length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#888', marginBottom: 8 }}>КОМБІНОВАНІ МАРШРУТИ</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {profile.completedLines.filter(l => l.type === 'modification').map((c, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px', borderRadius: 14, background: '#f4f2fb' }}>
+                    <div style={{ fontSize: 18, flexShrink: 0 }}>🔀</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: '#1a1a2e', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {c.name || c.modification || 'Комбінований маршрут'}
+                      </div>
+                      <div style={{ fontSize: 11, color: '#888' }}>
+                        {formatDate(c.completedAt)}{c.modification ? ` · ${c.modification}` : ''}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#6a5acd', flexShrink: 0 }}>+{c.finalXp} XP</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Бейджі */}
         <div style={card}>
           <div style={label}>Бейджі</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-            {BADGES.map(badge => {
-              const unlocked = badge.condition(profile);
-              return (
-                <div key={badge.id} style={{ background: '#faf8f5', borderRadius: 14, padding: '14px 8px', textAlign: 'center', border: '1.5px solid #f0ece6', opacity: unlocked ? 1 : 0.35, filter: unlocked ? 'none' : 'grayscale(1)' }}>
+            {(() => {
+              // Бейджі формуємо динамічно: базові + по одному на кожну живу лінію.
+              const badges: { id: string; icon: string; name: string; unlocked: boolean }[] = [];
+              badges.push({ id: 'explorer', icon: '🏅', name: 'Дослідник Коломиї', unlocked: profile.stats.totalSessions >= 1 });
+              for (const l of lines) {
+                badges.push({
+                  id: `line_${l.key}`,
+                  icon: lineEmojiFor(l.key),
+                  name: lineLabel(l.key),
+                  unlocked: hasLine(profile, l.key),
+                });
+              }
+              badges.push({
+                id: 'all_lines',
+                icon: '🏆',
+                name: 'Всі лінії',
+                unlocked: lines.length > 0 && lines.every(l => hasLine(profile, l.key)),
+              });
+              badges.push({ id: 'combined', icon: '🔀', name: 'Свій маршрут', unlocked: hasCombined(profile) });
+              badges.push({ id: 'hudzyk', icon: '🐾', name: 'Друг Ґудзика', unlocked: profile.totalXp >= 1000 });
+
+              return badges.map(badge => (
+                <div key={badge.id} style={{ background: '#faf8f5', borderRadius: 14, padding: '14px 8px', textAlign: 'center', border: '1.5px solid #f0ece6', opacity: badge.unlocked ? 1 : 0.35, filter: badge.unlocked ? 'none' : 'grayscale(1)' }}>
                   <div style={{ fontSize: 28, marginBottom: 6 }}>{badge.icon}</div>
                   <div style={{ fontSize: 11, fontWeight: 700, color: '#1a1a2e', lineHeight: 1.3 }}>{badge.name}</div>
                 </div>
-              );
-            })}
+              ));
+            })()}
           </div>
         </div>
         
