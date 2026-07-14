@@ -187,6 +187,7 @@ export default function ProfilePage() {
   const [lines, setLines]     = useState<LineInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [tappedBadge, setTappedBadge] = useState<Badge | null>(null);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -361,26 +362,37 @@ export default function ProfilePage() {
           )}
         </div>
 
-        {/* Бейджі */}
+        {/* Бейджі — компактна сітка іконок, назва при тапі */}
         {(() => {
           const groups = buildBadges(profile, lines);
           const all      = groups.flatMap(g => g.badges);
           const earned   = all.filter(b => b.unlocked).length;
           return (
             <div style={card}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                 <div style={{ ...label, marginBottom: 0 }}>Бейджі</div>
                 <div style={{ fontSize: 12, fontWeight: 700, color: '#89182c' }}>{earned} / {all.length}</div>
               </div>
               {groups.map(group => (
-                <div key={group.title} style={{ marginBottom: 18 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#888', marginBottom: 10 }}>{group.title.toUpperCase()}</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+                <div key={group.title} style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#aaa', marginBottom: 8, letterSpacing: 1 }}>{group.title.toUpperCase()}</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8 }}>
                     {group.badges.map(badge => (
-                      <div key={badge.id} style={{ background: '#faf8f5', borderRadius: 14, padding: '14px 8px', textAlign: 'center', border: '1.5px solid #f0ece6', opacity: badge.unlocked ? 1 : 0.35, filter: badge.unlocked ? 'none' : 'grayscale(1)' }}>
-                        <div style={{ fontSize: 28, marginBottom: 6 }}>{badge.icon}</div>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: '#1a1a2e', lineHeight: 1.3 }}>{badge.name}</div>
-                      </div>
+                      <button
+                        key={badge.id}
+                        onClick={() => setTappedBadge(badge)}
+                        title={badge.name}
+                        style={{
+                          aspectRatio: '1', border: 'none', borderRadius: 12, cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 24, lineHeight: 1,
+                          background: badge.unlocked ? '#faf8f5' : '#f4f2ef',
+                          opacity: badge.unlocked ? 1 : 0.4,
+                          filter: badge.unlocked ? 'none' : 'grayscale(1)',
+                        }}
+                      >
+                        {badge.icon}
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -388,6 +400,33 @@ export default function ProfilePage() {
             </div>
           );
         })()}
+
+        {/* Попап назви бейджа при тапі */}
+        {tappedBadge && (
+          <div
+            onClick={() => setTappedBadge(null)}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, zIndex: 1000 }}
+          >
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{ background: '#fff', borderRadius: 20, padding: '28px 24px', maxWidth: 300, width: '100%', textAlign: 'center' }}
+            >
+              <div style={{ fontSize: 56, marginBottom: 12, opacity: tappedBadge.unlocked ? 1 : 0.4, filter: tappedBadge.unlocked ? 'none' : 'grayscale(1)' }}>
+                {tappedBadge.icon}
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: '#1a1a2e', marginBottom: 6 }}>{tappedBadge.name}</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: tappedBadge.unlocked ? '#2D7A4F' : '#aaa', marginBottom: 20 }}>
+                {tappedBadge.unlocked ? '✓ Отримано' : '🔒 Ще не відкрито'}
+              </div>
+              <button
+                onClick={() => setTappedBadge(null)}
+                style={{ width: '100%', padding: 12, borderRadius: 12, border: 'none', background: '#89182c', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
+              >
+                Закрити
+              </button>
+            </div>
+          </div>
+        )}
         
         <button
           onClick={() => router.push('/shop')}
