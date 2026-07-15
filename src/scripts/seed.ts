@@ -411,7 +411,7 @@ async function seed() {
     // Оновлюємо лише структурні поля. quizzes та audioUrl навмисно НЕ чіпаємо —
     // це контент, який команда додає через адмінку (аудіо-екскурсії, питання).
     // Якщо їх класти в $set, повторний seed затре наповнення. Тому — $setOnInsert.
-    const { quizzes, audioUrl, ...structuralFields } = spot;
+    const { quizzes, audioUrl, shortCode, ...structuralFields } = spot as any;
     await SpotModel.updateOne(
       { slug: spot.slug },
       {

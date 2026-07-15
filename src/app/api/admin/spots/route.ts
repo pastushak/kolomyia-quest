@@ -33,7 +33,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     // Дозволяємо оновлювати тільки безпечні поля
-    const allowed = ['info', 'fullInfo', 'audioUrl', 'qrHint', 'quizzes', 'address'];
+    const allowed = ['info', 'fullInfo', 'audioUrl', 'qrHint', 'quizzes', 'address', 'shortCode'];
     const filtered = Object.fromEntries(
       Object.entries(updates).filter(([k]) => allowed.includes(k)),
     );
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
 
     // Дозволені поля при створенні
     const allowed = ['slug', 'name', 'lat', 'lng', 'address', 'qrHint', 'info',
-                     'audioUrl', 'fullInfo', 'type', 'lines', 'transfers'];
+                     'audioUrl', 'fullInfo', 'type', 'lines', 'transfers', 'shortCode'];
     const data = Object.fromEntries(
       Object.entries(body).filter(([k]) => allowed.includes(k)),
     );

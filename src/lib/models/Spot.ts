@@ -31,6 +31,17 @@ const SpotSchema = new Schema(
     audioUrl: { type: String, default: '' },
     fullInfo: { type: String, default: '' },
 
+    // 6-значний код з таблички — запасний вхід, якщо камера не спрацювала.
+    // sparse: наявні споти без коду не конфліктують за unique-індексом.
+    shortCode: {
+      type:      String,
+      unique:    true,
+      sparse:    true,
+      uppercase: true,
+      trim:      true,
+      default:   undefined,
+    },
+
     // Тип локації на маршруті
     type: {
       type:    String,
