@@ -40,6 +40,7 @@ interface SpotData {
   audioUrl:  string;
   fullInfo:  string;
   qrHint:    string;
+  shortCode?: string;
   type:      string;
   lines:     string[];
   transfers: string[];
@@ -61,7 +62,7 @@ const EMPTY_QUIZ = (line: string): QuizData => ({
 
 // ── QR компонент ──────────────────────────────────────────
 
-function QRItem({ url, label, sublabel, color }: { url: string; label: string; sublabel?: string; color: string }) {
+function QRItem({ url, label, sublabel, color, shortCode }: { url: string; label: string; sublabel?: string; color: string; shortCode?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -75,6 +76,15 @@ function QRItem({ url, label, sublabel, color }: { url: string; label: string; s
       <canvas ref={canvasRef} style={{ borderRadius: 8, display: 'block', margin: '0 auto' }} />
       <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: '#1A1A2E' }}>{label}</div>
       {sublabel && <div style={{ fontSize: 10, color: '#888', marginTop: 2 }}>{sublabel}</div>}
+      {/* Код з таблички — запасний вхід, якщо камера не спрацює */}
+      {shortCode && (
+        <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed #ddd' }}>
+          <div style={{ fontSize: 8, color: '#aaa', letterSpacing: 1, marginBottom: 2 }}>АБО КОД</div>
+          <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: 3, fontFamily: 'ui-monospace, monospace', color: '#1A1A2E' }}>
+            {shortCode}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -286,7 +296,7 @@ export default function AdminPage() {
   function openCreate() {
     setEditing({
       _id: '', slug: '', name: '', address: '', info: '', audioUrl: '',
-      fullInfo: '', qrHint: '', type: 'regular', lines: [], transfers: [], quizzes: [],
+      fullInfo: '', qrHint: '', shortCode: '', type: 'regular', lines: [], transfers: [], quizzes: [],
     });
     setIsNewSpot(true);
     setExpandedQuiz(null);
@@ -318,6 +328,7 @@ export default function AdminPage() {
       type: editing.type, lines: editing.lines, transfers: editing.transfers,
       info: editing.info, fullInfo: editing.fullInfo, audioUrl: editing.audioUrl,
       qrHint: editing.qrHint, address: editing.address,
+      shortCode: editing.shortCode?.trim().toUpperCase() || undefined,
       quizzes: filledQuizzes.length > 0 ? filledQuizzes : null,
     };
 
@@ -644,6 +655,23 @@ export default function AdminPage() {
                       <input type="number" step="any" value={editing.lng ?? ''} onChange={e => setEditing({ ...editing, lng: e.target.value === '' ? undefined : parseFloat(e.target.value) })}
                         placeholder="25.0387"
                         style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1.5px solid #EEEEF5', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+                    </div>
+                  </div>
+
+                  {/* Код з таблички */}
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 6 }}>
+                      Код з таблички <span style={{ fontWeight: 400, color: '#888' }}>— запасний вхід, якщо камера не спрацює</span>
+                    </label>
+                    <input
+                      value={editing.shortCode ?? ''}
+                      onChange={e => setEditing({ ...editing, shortCode: e.target.value.toUpperCase().replace(/[^A-Z2-9]/g, '').slice(0, 6) })}
+                      placeholder="RATNXR"
+                      maxLength={6}
+                      style={{ width: 180, padding: '10px 12px', borderRadius: 10, border: '1.5px solid #EEEEF5', fontSize: 16, fontWeight: 700, letterSpacing: 3, fontFamily: 'ui-monospace, monospace', outline: 'none', boxSizing: 'border-box' }}
+                    />
+                    <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>
+                      6 символів. Без O, I, S, 0, 1, 5 — щоб турист не переплутав на табличці.
                     </div>
                   </div>
 
@@ -1016,7 +1044,7 @@ export default function AdminPage() {
               <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                 {spots.map(spot => {
                   const color = spot.type === 'finish' ? '#7F77DD' : lineColor(spot.lines[0] as Line);
-                  return <QRItem key={spot.slug} url={`${BASE_URL}/info/${spot.slug}`} label={spot.name} sublabel={spot.address} color={color} />;
+                  return <QRItem key={spot.slug} url={`${BASE_URL}/info/${spot.slug}`} label={spot.name} sublabel={spot.address} color={color} shortCode={spot.shortCode} />;
                 })}
               </div>
             )}
