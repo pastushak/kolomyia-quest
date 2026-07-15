@@ -28,6 +28,11 @@ export default function SpotPage() {
   const [showMap, setShowMap]     = useState(true);    // карта розгорнута/згорнута
   const [loading, setLoading]     = useState(true);
   const [showScanner, setShowScanner] = useState(false);
+  // Запасний вхід: код з таблички, якщо камера не спрацювала (актуально для iPhone)
+  const [showCodeInput, setShowCodeInput] = useState(false);
+  const [codeValue, setCodeValue]         = useState('');
+  const [codeError, setCodeError]         = useState('');
+  const [codeBusy, setCodeBusy]           = useState(false);
   const [mounted, setMounted]     = useState(false);
   const [quizDone, setQuizDone]   = useState(false);   // квіз пройдено — показуємо вибір далі/пересадка
   const [switching, setSwitching] = useState(false);   // йде процес пересадки
@@ -122,6 +127,31 @@ export default function SpotPage() {
         router.push(`/spot/${scannedSlug}`);
       }
     } catch { alert('Невірний QR-код'); }
+  }
+
+  // Код з таблички → знаходимо спот → далі рівно та сама логіка, що й після скану QR.
+  async function handleCodeSubmit() {
+    const code = codeValue.trim().toUpperCase();
+    if (code.length !== 6) { setCodeError('Код складається з 6 символів'); return; }
+
+    setCodeBusy(true); setCodeError('');
+    try {
+      const res  = await fetch(`/api/spots/by-code?code=${encodeURIComponent(code)}`);
+      const data = await res.json();
+
+      if (!res.ok) { setCodeError(data.error || 'Не вдалося перевірити код'); setCodeBusy(false); return; }
+
+      const foundSlug: string = data.slug;
+      if (foundSlug === slug) {
+        trackQrScan(slug);              // присутність підтверджено — так само, як сканом
+        router.push(`/info/${slug}`);   // ті самі ворота: інфо → «Ого, цікаво» → квіз
+      } else {
+        router.push(`/spot/${foundSlug}`);   // код іншої локації — ведемо туди
+      }
+    } catch {
+      setCodeError('Помилка мережі. Спробуй ще раз.');
+      setCodeBusy(false);
+    }
   }
 
   async function handleQuizComplete(serverXp: number) {
@@ -248,6 +278,51 @@ export default function SpotPage() {
                 {unlocked ? 'Повторно сканувати QR-код' : 'Я на місці — сканую QR-код'}
               </button>
 
+              {/* Запасний вхід: код з таблички. Рятує там, де камера недоступна
+                  (Safari на iPhone не має BarcodeDetector, відхилений дозвіл тощо). */}
+              {!showCodeInput ? (
+                <button
+                  onClick={() => { setShowCodeInput(true); setCodeError(''); }}
+                  style={{ width: '100%', padding: 12, borderRadius: 14, border: '1.5px solid #E8E8EF', background: 'transparent', color: '#8888A8', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                >
+                  ⌨️ Камера не працює? Введи код з таблички
+                </button>
+              ) : (
+                <div style={{ padding: 14, borderRadius: 14, border: '1.5px solid #E8E8EF', background: '#FAFAFC' }}>
+                  <div style={{ fontSize: 12, color: '#8888A8', marginBottom: 8, textAlign: 'center' }}>
+                    Код написаний під QR-кодом на табличці
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input
+                      value={codeValue}
+                      onChange={e => { setCodeValue(e.target.value.toUpperCase().replace(/[^A-Z2-9]/g, '').slice(0, 6)); setCodeError(''); }}
+                      onKeyDown={e => { if (e.key === 'Enter') handleCodeSubmit(); }}
+                      placeholder="RATNXR"
+                      autoFocus
+                      inputMode="text"
+                      autoCapitalize="characters"
+                      style={{ flex: 1, padding: '12px 14px', borderRadius: 12, border: '1.5px solid #E8E8EF', fontSize: 20, fontWeight: 800, letterSpacing: 4, textAlign: 'center', fontFamily: 'ui-monospace, monospace', outline: 'none', boxSizing: 'border-box' }}
+                    />
+                    <button
+                      onClick={handleCodeSubmit}
+                      disabled={codeBusy || codeValue.length !== 6}
+                      style={{ padding: '12px 20px', borderRadius: 12, border: 'none', background: codeValue.length === 6 ? color : '#E8E8EF', color: codeValue.length === 6 ? '#fff' : '#AAAAB8', fontSize: 15, fontWeight: 700, cursor: codeValue.length === 6 ? 'pointer' : 'not-allowed' }}
+                    >
+                      {codeBusy ? '…' : '→'}
+                    </button>
+                  </div>
+                  {codeError && (
+                    <div style={{ fontSize: 12, color: '#89182c', marginTop: 8, textAlign: 'center' }}>{codeError}</div>
+                  )}
+                  <button
+                    onClick={() => { setShowCodeInput(false); setCodeValue(''); setCodeError(''); }}
+                    style={{ width: '100%', marginTop: 8, padding: 8, border: 'none', background: 'transparent', color: '#AAAAB8', fontSize: 12, cursor: 'pointer' }}
+                  >
+                    Сховати
+                  </button>
+                </div>
+              )}
+
               <button
                 onClick={() => setShowQuiz(true)}
                 disabled={!unlocked}
@@ -258,7 +333,7 @@ export default function SpotPage() {
 
               {!unlocked && (
                 <p style={{ fontSize: 12, color: '#8888A8', textAlign: 'center', margin: '2px 0 0', lineHeight: 1.5 }}>
-                  Спочатку проскануй QR-код локації та ознайомся з інформацією про місце.
+                  Спочатку проскануй QR-код локації (або введи код з таблички) та ознайомся з інформацією про місце.
                 </p>
               )}
             </div>
