@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { getSession, completeSpot, trackQrScan, switchLine, isUnlocked } from '@/lib/session';
 import { lineColor, lineLabel, ensureLinesRegistered, getNextSlug, getQuizForLine } from '@/lib/utils';
@@ -80,6 +80,15 @@ export default function SpotPage() {
     return () => navigator.geolocation.clearWatch(id);
   }, []);
 
+  // Питання обираємо ОДИН раз на спот+лінію. Без useMemo зважений рандом
+  // прокручувався на кожному ререндері (напр. при невірній відповіді) —
+  // питання «стрибали» й ламали драбину спроб 100/50/25.
+  // Хук стоїть ДО early-return'ів нижче: порядок хуків має бути незмінним.
+  const quiz = useMemo(
+    () => (spot && session ? getQuizForLine(spot, session.line) : null),
+    [spot?.slug, spot?.quizzes, session?.line],
+  );
+
   if (!mounted || !session) return null;
 
   if (loading) return (
@@ -102,7 +111,6 @@ export default function SpotPage() {
   const color       = lineColor(line);
   const spotIndex   = order.indexOf(slug);
   const spotNumber  = spotIndex + 1;
-  const quiz        = getQuizForLine(spot, line);
   const hudzykMood  = showQuiz ? 'curious' : 'guide';
   const hudzykMsg   = showQuiz ? 'Відповідай!' : `Точка ${spotNumber}!`;
 
