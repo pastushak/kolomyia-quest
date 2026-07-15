@@ -10,7 +10,6 @@ import LocationCard from '@/components/quest/LocationCard';
 import QuizCard from '@/components/quest/QuizCard';
 import dynamic from 'next/dynamic';
 
-const QrScanner = dynamic(() => import('@/components/quest/QrScanner'), { ssr: false });
 const MapView   = dynamic(() => import('@/components/map/MapView'), { ssr: false });
 
 
@@ -27,7 +26,6 @@ export default function SpotPage() {
   const [unlocked, setUnlocked]   = useState(false);   // ворота пройдено (скан + «Ого»)
   const [showMap, setShowMap]     = useState(true);    // карта розгорнута/згорнута
   const [loading, setLoading]     = useState(true);
-  const [showScanner, setShowScanner] = useState(false);
   // Запасний вхід: код з таблички, якщо камера не спрацювала (актуально для iPhone)
   const [showCodeInput, setShowCodeInput] = useState(false);
   const [codeValue, setCodeValue]         = useState('');
@@ -113,29 +111,6 @@ export default function SpotPage() {
   const spotNumber  = spotIndex + 1;
   const hudzykMood  = showQuiz ? 'curious' : 'guide';
   const hudzykMsg   = showQuiz ? 'Відповідай!' : `Точка ${spotNumber}!`;
-
-  function handleQrScan(text: string) {
-    setShowScanner(false);
-    try {
-      // Спробуємо розпарсити як URL
-      let scannedSlug = text.trim();
-      if (text.startsWith('http')) {
-        const parts = new URL(text).pathname.split('/').filter(Boolean);
-        scannedSlug = parts[parts.length - 1];
-      }
-      // Якщо slug містить /spot/ або /info/ — беремо останню частину
-      if (scannedSlug.includes('/')) {
-        scannedSlug = scannedSlug.split('/').filter(Boolean).pop() ?? scannedSlug;
-      }
-      if (scannedSlug === slug) {
-        trackQrScan(slug);   // реальний скан саме цієї точки
-        // Ворота: ведемо на розширену інфо, де кнопка «Ого! Так цікаво» розблокує квіз
-        router.push(`/info/${slug}`);
-      } else {
-        router.push(`/spot/${scannedSlug}`);
-      }
-    } catch { alert('Невірний QR-код'); }
-  }
 
   // Код з таблички → знаходимо спот → далі рівно та сама логіка, що й після скану QR.
   async function handleCodeSubmit() {
@@ -257,12 +232,6 @@ export default function SpotPage() {
           </div>
         )}
 
-        {showScanner && (
-          <div style={{ marginBottom: 16 }}>
-            <QrScanner onScan={handleQrScan} onClose={() => setShowScanner(false)} />
-          </div>
-        )}
-
         {quizDone ? null : !showQuiz ? (
           <>
             {/* Інформація про локацію */}
@@ -277,17 +246,24 @@ export default function SpotPage() {
               lineColor={color}
             />
 
-            {/* ── Ворота: скан QR + перехід до квіза ── */}
+            {/* ── Ворота: підтвердження присутності + перехід до квіза ── */}
             <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <button
-                onClick={() => setShowScanner(true)}
-                style={{ width: '100%', padding: 16, borderRadius: 16, border: 'none', background: color, color: '#fff', fontSize: 16, fontWeight: 700, cursor: 'pointer' }}
-              >
-                {unlocked ? 'Повторно сканувати QR-код' : 'Я на місці — сканую QR-код'}
-              </button>
+              {/* Головний шлях — нативна камера телефону. Вона працює на всіх
+                  пристроях (iPhone теж), на відміну від вбудованого сканера. */}
+              {!unlocked && (
+                <div style={{ padding: 16, borderRadius: 16, background: color + '12', border: `1.5px solid ${color}33` }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                    <span style={{ fontSize: 22 }}>📷</span>
+                    <span style={{ fontSize: 15, fontWeight: 700, color: '#1A1A2E' }}>Наведи камеру телефону на QR-код</span>
+                  </div>
+                  <div style={{ fontSize: 13, color: '#6a6a80', lineHeight: 1.5 }}>
+                    Відкрий звичайний застосунок «Камера», наведи на табличку — і перейди за посиланням, що зʼявиться.
+                  </div>
+                </div>
+              )}
 
               {/* Запасний вхід: код з таблички. Рятує там, де камера недоступна
-                  (Safari на iPhone не має BarcodeDetector, відхилений дозвіл тощо). */}
+                  (відхилений дозвіл, старий телефон, погане освітлення). */}
               {!showCodeInput ? (
                 <button
                   onClick={() => { setShowCodeInput(true); setCodeError(''); }}
@@ -341,7 +317,7 @@ export default function SpotPage() {
 
               {!unlocked && (
                 <p style={{ fontSize: 12, color: '#8888A8', textAlign: 'center', margin: '2px 0 0', lineHeight: 1.5 }}>
-                  Спочатку проскануй QR-код локації (або введи код з таблички) та ознайомся з інформацією про місце.
+                  Спершу підтверди, що ти на місці — через QR-код або код з таблички — та ознайомся з інформацією про локацію.
                 </p>
               )}
             </div>
